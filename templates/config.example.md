@@ -21,7 +21,7 @@ acceptance_runner is what a task spec's acceptance command builds on (the
 unit runner) — usually identical to `test` unless your project splits
 "run everything" from "run one file". -->
 test:       pnpm vitest run
-lint:       pnpm eslint
+lint:       pnpm eslint            # base command only — callers/specs append the paths to lint (WIX uses `pnpm eslint <paths>`).
 typecheck:  pnpm tsc --noEmit
 acceptance_runner: pnpm vitest run
 
@@ -35,8 +35,9 @@ instead of reporting a false BLOCKED. -->
 backend:        codex-mcp
 dispatch_tool:  mcp__codex__codex
 reply_tool:     mcp__codex__codex-reply
+approval_mode:  pilot                  # pilot = backend asks on-request; automated = never asks. The implementer's dispatch SEAM reads this to set the backend's approval policy.
 tiers:          [sol, terra, luna]
-ratelimit_signal: "usage-cap | 429 | rate limit"
+ratelimit_signal: "usage-cap | 429 | rate limit"  # illustrative — the exact substrings depend on your backend's actual error text.
 
 ## Security-routed files  → always KEEP lane (ROUTING rule a)
 <!-- Any task whose Touch list includes one of these routes KEEP (the
@@ -56,7 +57,9 @@ security_routed:
 when not security-critical (pinned UI primitives, lockfiles, secrets).
 /lanes-init seeds this from your README/CONTRIBUTING "do not touch"
 notes and common patterns (vendored UI kits, lockfiles, .env*); you
-confirm and extend it. -->
+confirm and extend it. Pipeline-owned paths named by plans_dir/tasks_dir/
+ledger are already protected structurally and do NOT need to be repeated
+here. -->
 do_not_touch:
   - src/components/ui/**
   - pnpm-lock.yaml
