@@ -80,7 +80,7 @@ time. Categories typically include:
 conform to. Write them as code, not prose. This is what keeps parallel
 tasks compatible without shared context.>
 
-```
+```text
 // <app_subdir>/src/lib/example.ts   (illustrative — use the real path/
 // language for this project's stack)
 function doThing(id: string, opts: { includeExpired?: boolean }): Thing
