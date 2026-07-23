@@ -50,7 +50,7 @@ wins.
    and only there; do not route from memory.
 3. The project's `AGENTS.md` (repo root) — standing exclusions, stack
    facts, pipeline mode.
-4. `agents/lanes-implementer.md` — its Phase 1 validation gate is the
+4. `${CLAUDE_PLUGIN_ROOT}/agents/lanes-implementer.md` — its Phase 1 validation gate is the
    compiler for your output. Every spec you emit must pass all five items.
 5. The project's `review_suite.id_index` (`.lanes/config.md`) — the
    coverage table mapping workflow/UX IDs to test specs. Source for
@@ -131,7 +131,8 @@ Requirements beyond plain TEMPLATE.md conformance:
   Estimated scope S/M/L by Touch-list size; Model hint = the final
   lane/tier from Step 3 (a `.lanes/config.md` `tiers` name, or `keep` — a
   `keep` hint means this task should not have been emitted at all; treat
-  that as a Step-3 bug and stop before writing the file).
+  that as a Step-3 bug and stop before writing the file; see Step 5
+  item 1).
 - **Context**: only decisions the delegate can't infer — including, when
   "Affected workflow IDs" is "none", the one-line justification for that.
 - **Files/Touch**: exactly the plan's file list for this task, paths from
@@ -180,7 +181,7 @@ Before writing each spec file, two consistency checks:
 
 ## Step 5 — Gate-check your own output
 
-Walk every emitted spec through `agents/lanes-implementer.md`'s Phase 1
+Walk every emitted spec through `${CLAUDE_PLUGIN_ROOT}/agents/lanes-implementer.md`'s Phase 1
 items, as that agent would:
 
 1. Model hint is not `keep` (should be true by construction).

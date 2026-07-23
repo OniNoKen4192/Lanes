@@ -67,8 +67,10 @@ found here is a **proposal** for Phase 2 to confirm, not a final answer.
 
 - **Manifest → stack, package manager, script names.** Read the manifest
   found in Phase 0. Extract whatever it exposes about the toolchain
-  (declared scripts/tasks, package manager lockfile if present, language
-  version markers) and map named scripts onto the config's verification
+  (declared scripts/tasks, package manager lockfile if present — e.g. a
+  `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
+  `Cargo.lock`, `Gemfile.lock`, etc. — language version markers) and map
+  named scripts onto the config's verification
   fields: `test`, `lint`, `typecheck`, `acceptance_runner` (usually the
   same command as `test` unless the project distinguishes "run everything"
   from "run one target").

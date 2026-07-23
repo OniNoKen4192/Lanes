@@ -23,6 +23,9 @@ contract.
   via the `codex` MCP server. Without a backend, every task simply stays
   in the KEEP lane (see the honesty note below).
 - **Claude Code**, obviously.
+- `lanes-reviewer` ships with `model: fable` in its frontmatter — confirm
+  that alias resolves to your own frontier model, or override it, before
+  your first review.
 
 ## Install
 
@@ -74,7 +77,7 @@ flowchart LR
     B -->|"DELEGATE task"| C["Implement\n(lanes-implementer →\nDELEGATE backend)"]
     B -->|"KEEP task: no spec file"| E["superpowers inner loop\n(unchanged)"]
     C --> D["Review\n(lanes-reviewer — KEEP,\nfrontier judgment)"]
-    D -->|APPROVE| F["merged"]
+    D -->|APPROVE| F["ledger + done"]
     D -->|"FIX (delta spec)"| C
     D -->|REJECT| A
 ```

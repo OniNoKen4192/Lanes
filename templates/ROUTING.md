@@ -19,7 +19,7 @@ reviewer bears verification that such tests bind to the guard under test
 (the sentinel-binding pattern).
 
 **(b) Structural work → KEEP.** Structural means: changes to the app's
-route/layout architecture (new layouts, restructured nesting, layout-file
+layout architecture (new layouts, restructured nesting, layout-file
 edits beyond adding/adjusting nav entries); route architecture (moving or
 renaming routes, route groups, middleware); or anything cross-cutting
 (>4 files, or spanning routes + lib + components in one task). NOT
