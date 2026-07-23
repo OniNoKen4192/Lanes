@@ -1,0 +1,18 @@
+{
+  "name": "lanes",
+  "owner": {
+    "name": "Ken Culver"
+  },
+  "metadata": {
+    "description": "Lanes: a portable cross-model KEEP/DELEGATE development pipeline for Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "lanes",
+      "source": "./",
+      "description": "Cross-model task routing: frontier Claude plans and reviews; a delegated backend implements. Requires superpowers.",
+      "version": "0.1.0",
+      "keywords": ["workflow", "cross-model", "codex", "superpowers"]
+    }
+  ]
+}

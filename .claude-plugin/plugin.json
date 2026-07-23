@@ -1,0 +1,12 @@
+{
+  "name": "lanes",
+  "description": "Route each dev task to the cheapest model that can do it correctly: frontier Claude for planning, review, and security-critical work; a delegated subscription-pool model (Codex via MCP) for the rest. An add-on to superpowers.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Ken Culver"
+  },
+  "homepage": "https://github.com/<you>/lanes",
+  "repository": "https://github.com/<you>/lanes",
+  "license": "MIT",
+  "keywords": ["workflow", "cross-model", "codex", "superpowers", "delegation", "routing"]
+}
