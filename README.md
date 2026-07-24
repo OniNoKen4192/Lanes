@@ -30,12 +30,9 @@ contract.
 ## Install
 
 ```
-/plugin marketplace add <you>/lanes
+/plugin marketplace add OniNoKen4192/Lanes
 /plugin install lanes@lanes
 ```
-
-(`<you>` is a placeholder — the GitHub owner for this repo isn't decided
-yet. Substitute whoever ends up hosting it.)
 
 ## Set up a project
 
