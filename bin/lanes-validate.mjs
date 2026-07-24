@@ -51,6 +51,63 @@ function matchAny(patterns, p) {
   return null;
 }
 
+// ---------------------------------------------------------------- parsing
+
+// Minimal, targeted parse of .lanes/config.md (full schema migration is
+// issue #5). Recognizes top-level `key: value` scalars and `key:` +
+// indented `- item` lists. Markdown headings, HTML comments, and
+// trailing `# …` comments are stripped.
+function parseConfig(text) {
+  const stripped = text.replace(/<!--[\s\S]*?-->/g, "");
+  const scalars = {};
+  const lists = {};
+  let currentList = null;
+  for (const raw of stripped.split(/\r?\n/)) {
+    const line = raw.replace(/\s#.*$/, "").trimEnd();
+    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    const item = line.match(/^\s+-\s+(.+)$/);
+    if (item && currentList) { lists[currentList].push(item[1].trim()); continue; }
+    const kv = line.match(/^([a-z_]+):\s*(.*)$/);
+    if (kv) {
+      const [, key, value] = kv;
+      if (value === "") { lists[key] = []; currentList = key; }
+      else { scalars[key] = value.trim(); currentList = null; }
+    } else {
+      currentList = null;
+    }
+  }
+  return { scalars, lists };
+}
+
+function loadConfig() {
+  const p = ".lanes/config.md";
+  if (!fs.existsSync(p)) throw new Error(".lanes/config.md not found — run /lanes-init first");
+  const { scalars, lists } = parseConfig(fs.readFileSync(p, "utf8"));
+  for (const key of ["security_routed", "do_not_touch"]) {
+    if (!Array.isArray(lists[key])) {
+      throw new Error(`.lanes/config.md: required list '${key}' is missing or unparseable`);
+    }
+  }
+  return {
+    security_routed: lists.security_routed,
+    do_not_touch: lists.do_not_touch,
+    tasks_dir: scalars.tasks_dir || "docs/superpowers/tasks",
+    plans_dir: scalars.plans_dir || "docs/superpowers/plans",
+    ledger: scalars.ledger || ".superpowers/sdd/progress.md",
+  };
+}
+
+// Extracts what the gate/audit need from a TEMPLATE.md-conformant spec:
+// Task ID and Model hint from Meta, Touch paths from the `### Touch` table.
+function parseSpec(text) {
+  const taskId = (text.match(/^\s*-\s+\*\*Task ID\*\*:\s*(\S+)/m) || [])[1];
+  const modelHint = (text.match(/^\s*-\s+\*\*Model hint\*\*:\s*(\S+)/m) || [])[1];
+  const touchSection = (text.split(/^### Touch\s*$/m)[1] || "").split(/^### /m)[0];
+  const touch = [];
+  for (const m of touchSection.matchAll(/^\|\s*`([^`]+)`\s*\|/gm)) touch.push(m[1]);
+  return { taskId, modelHint, touch };
+}
+
 // Mirrors the examples table in docs/PATH-MATCHING.md — keep in sync.
 const MATCH_VECTORS = [
   // [pattern, path, expected]
@@ -73,10 +130,71 @@ const MATCH_VECTORS = [
   [".env", ".env.example", false],                            // bare file ≠ prefix match
 ];
 
+// ---------------------------------------------------------------- parse checks
+
+const SAMPLE_CONFIG = `# Lanes config
+<!-- comment spanning
+lines -->
+## App root
+app_subdir: myapp
+command_prefix: cd myapp &&
+
+test: pnpm vitest run
+approval_mode: pilot    # trailing comment
+
+security_routed:
+  - src/auth.ts
+  - prisma/migrations/**
+
+do_not_touch:
+  - pnpm-lock.yaml
+  - .env
+
+tasks_dir: docs/superpowers/tasks
+`;
+
+const SAMPLE_SPEC = `# TASK: sample
+## Meta
+- **Task ID**: DEMO.03
+- **Parent plan**: docs/superpowers/plans/x.md
+- **Model hint**: luna
+
+## Files
+
+### Touch
+| Path | Action | Notes |
+|------|--------|-------|
+| \`src/lib/example.ts\` | modify | add X |
+| \`src/lib/__tests__/example.test.ts\` | create | see Acceptance |
+
+### Do NOT touch
+- everything else
+`;
+
+function runParseChecks() {
+  let failures = 0;
+  const expect = (label, got, want) => {
+    if (JSON.stringify(got) !== JSON.stringify(want)) {
+      failures++;
+      console.error(`FAIL ${label}: got ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+    }
+  };
+  const cfg = parseConfig(SAMPLE_CONFIG);
+  expect("config.security_routed", cfg.lists.security_routed, ["src/auth.ts", "prisma/migrations/**"]);
+  expect("config.do_not_touch", cfg.lists.do_not_touch, ["pnpm-lock.yaml", ".env"]);
+  expect("config.tasks_dir", cfg.scalars.tasks_dir, "docs/superpowers/tasks");
+  expect("config.approval_mode", cfg.scalars.approval_mode, "pilot"); // trailing comment stripped
+  const spec = parseSpec(SAMPLE_SPEC);
+  expect("spec.taskId", spec.taskId, "DEMO.03");
+  expect("spec.modelHint", spec.modelHint, "luna");
+  expect("spec.touch", spec.touch, ["src/lib/example.ts", "src/lib/__tests__/example.test.ts"]);
+  return failures;
+}
+
 // ---------------------------------------------------------------- selftest
 
 function runSelftest() {
-  let failures = 0;
+  let failures = runParseChecks();
   for (const [pattern, p, expected] of MATCH_VECTORS) {
     const got = matchesPattern(pattern, p);
     if (got !== expected) {
@@ -85,7 +203,7 @@ function runSelftest() {
     }
   }
   console.log(failures === 0
-    ? `selftest OK (${MATCH_VECTORS.length} match vectors)`
+    ? `selftest OK (${MATCH_VECTORS.length} match vectors + parse checks)`
     : `selftest: ${failures} failure(s)`);
   process.exit(failures === 0 ? 0 : 2);
 }
