@@ -340,6 +340,70 @@ function runGate(specPathArg) {
   console.log(JSON.stringify({ ok: true, task: spec.taskId, base_sha: state.base_sha, state_path: statePath }));
 }
 
+// ---------------------------------------------------------------- audit
+
+function runAudit(taskIdArg) {
+  if (!taskIdArg) { console.error("audit: --task <id> required"); process.exit(1); }
+  const root = git("rev-parse", "--show-toplevel");
+  process.chdir(root);
+  const config = loadConfig();
+
+  const statePath = `.lanes/state/${taskIdArg.replace(/[^A-Za-z0-9._-]/g, "_")}.json`;
+  if (!fs.existsSync(statePath)) {
+    console.log(JSON.stringify({ task: taskIdArg, verdict: "violations",
+      error: `no baseline state at ${statePath} — was this task dispatched through the gate?` }));
+    process.exit(2);
+  }
+  const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  const specText = fs.readFileSync(state.spec_path, "utf8");
+  const spec = parseSpec(specText);
+
+  // All four surfaces (§3.2): committed, staged, unstaged, untracked.
+  const changed = new Set();
+  const collect = (out) => {
+    for (const line of out.split("\n")) {
+      if (!line.trim()) continue;
+      const parts = line.split("\t");
+      const paths = /^[RC]/.test(parts[0]) ? parts.slice(1) : [parts[1]]; // renames/copies: both sides (§6.4)
+      for (const p of paths) if (p) changed.add(normalizePath(p));
+    }
+  };
+  collect(git("diff", "--name-status", `${state.base_sha}..HEAD`));
+  collect(git("diff", "--name-status", "--cached"));
+  collect(git("diff", "--name-status"));
+  for (const p of git("ls-files", "--others", "--exclude-standard").split("\n")) {
+    if (p.trim()) changed.add(normalizePath(p));
+  }
+
+  const allowlist = [".lanes", config.tasks_dir, config.plans_dir, config.ledger];
+  const report = {
+    task: state.task,
+    base_sha: state.base_sha,
+    spec_modified: sha256(specText) !== state.spec_sha256,
+    commits_past_base: git("rev-list", `${state.base_sha}..HEAD`).split("\n").filter(Boolean),
+    in_scope: [], out_of_scope: [], forbidden: [], allowlisted: [],
+  };
+  for (const p of [...changed].sort()) {
+    // Deny beats allow (§6.7): forbidden wins even over the pipeline allowlist.
+    const secHit = matchAny(config.security_routed, p);
+    const dntHit = secHit ? null : matchAny(config.do_not_touch, p);
+    if (secHit || dntHit) {
+      report.forbidden.push({ path: p, list: secHit ? "security_routed" : "do_not_touch", pattern: secHit || dntHit });
+    } else if (matchAny(allowlist, p)) {
+      report.allowlisted.push(p);
+    } else if (matchAny(spec.touch, p)) {
+      report.in_scope.push(p);
+    } else {
+      report.out_of_scope.push(p);
+    }
+  }
+  report.verdict =
+    (report.forbidden.length || report.out_of_scope.length || report.commits_past_base.length)
+      ? "violations" : "clean";
+  console.log(JSON.stringify(report, null, 2));
+  process.exit(report.verdict === "clean" ? 0 : 2);
+}
+
 // ---------------------------------------------------------------- CLI
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -351,6 +415,7 @@ function argOf(flag) {
 try {
   if (cmd === "selftest") runSelftest();
   else if (cmd === "gate") runGate(argOf("--spec"));
+  else if (cmd === "audit") runAudit(argOf("--task"));
   else {
     console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | selftest>");
     process.exit(1);
