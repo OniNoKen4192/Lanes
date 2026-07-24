@@ -22,7 +22,7 @@ delegate backend make no guarantees about their working directory.
 
 ## The Template
 
-```markdown
+````markdown
 # TASK: <short-slug>
 
 ## Meta
@@ -148,7 +148,7 @@ FILES_CHANGED: <list with one-line summary each>
 TEST_OUTPUT: <last 20 lines of the acceptance command>
 DEVIATIONS: <anything done differently than specified, and why — or "none">
 BLOCKED_REASON: <only if BLOCKED: what was needed that the spec didn't provide>
-```
+````
 
 ---
 
