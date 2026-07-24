@@ -212,6 +212,117 @@ function runSelftest() {
   process.exit(failures === 0 ? 0 : 2);
 }
 
+// ---------------------------------------------------------------- git
+
+function git(...args) {
+  return execFileSync("git", args, { encoding: "utf8" }).trimEnd();
+}
+
+function sha256(buf) {
+  return createHash("sha256").update(buf).digest("hex");
+}
+
+// One `git status --porcelain` line → the path(s) it names.
+// Renames arrive as "R  old -> new"; quoted paths lose their quotes.
+function statusPaths(line) {
+  const unquote = (s) => s.replace(/^"(.*)"$/, "$1");
+  const body = line.slice(3);
+  return (body.includes(" -> ") ? body.split(" -> ") : [body])
+    .map((s) => normalizePath(unquote(s)));
+}
+
+function submodulePaths() {
+  if (!fs.existsSync(".gitmodules")) return [];
+  const out = [];
+  for (const m of fs.readFileSync(".gitmodules", "utf8").matchAll(/^\s*path\s*=\s*(.+)$/gm)) {
+    out.push(normalizePath(m[1]));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- gate
+
+function gateFail(check, reason, details = {}) {
+  console.log(JSON.stringify({ ok: false, check, reason, ...details }));
+  process.exit(2);
+}
+
+function runGate(specPathArg) {
+  if (!specPathArg) { console.error("gate: --spec <path> required"); process.exit(1); }
+  const root = git("rev-parse", "--show-toplevel");
+  process.chdir(root);
+
+  let config;
+  try { config = loadConfig(); } catch (err) { gateFail("config", String(err.message || err)); }
+
+  const specPath = normalizePath(specPathArg);
+  if (!fs.existsSync(specPath)) gateFail("spec", `spec file not found: ${specPath}`);
+  const specText = fs.readFileSync(specPath, "utf8");
+  const spec = parseSpec(specText);
+  if (!spec.taskId) gateFail("spec", "spec has no '**Task ID**:' entry in Meta");
+  if (!spec.touch.length) gateFail("spec", "spec's Touch table is empty or unparseable");
+
+  // Routing law (§3.1 check 4): a keep-hinted spec never dispatches.
+  if ((spec.modelHint || "").toLowerCase() === "keep") {
+    gateFail("routing",
+      `spec ${spec.taskId} is 'Model hint: keep' — security-routed work must go to a KEEP implementer, never DELEGATE`);
+  }
+
+  // Clean baseline except pipeline allowlist (§3.1 check 2, §2 decision 3).
+  const allowlist = [".lanes", config.tasks_dir, config.plans_dir, config.ledger];
+  const dirty = [];
+  for (const line of git("status", "--porcelain", "--untracked-files=all").split("\n")) {
+    if (!line.trim()) continue;
+    for (const p of statusPaths(line)) {
+      if (!matchAny(allowlist, p)) dirty.push(p);
+    }
+  }
+  if (dirty.length) {
+    gateFail("clean_baseline",
+      "working tree is not clean — commit or stash these before dispatching so every post-task diff is attributable to the delegate",
+      { dirty });
+  }
+
+  // Security gate + path hygiene on every Touch path (§3.1 check 5, §6).
+  const submodules = submodulePaths();
+  for (const t of spec.touch) {
+    const p = normalizePath(t);
+    if (path.isAbsolute(p) || /(^|\/)\.\.(\/|$)/.test(p)) {
+      gateFail("security_gate", `Touch path escapes the repo: ${t}`);
+    }
+    const sub = matchAny(submodules, p);
+    if (sub) gateFail("security_gate", `Touch path is inside submodule '${sub}': ${t}`);
+    if (fs.existsSync(p) && fs.lstatSync(p).isSymbolicLink()) {
+      const real = normalizePath(fs.realpathSync(p)).toLowerCase();
+      if (!real.startsWith(normalizePath(root).toLowerCase() + "/")) {
+        gateFail("security_gate", `Touch path is a symlink resolving outside the repo: ${t}`);
+      }
+    }
+    for (const [list, patterns] of [["security_routed", config.security_routed], ["do_not_touch", config.do_not_touch]]) {
+      const hit = matchAny(patterns, p);
+      if (hit) {
+        gateFail("security_gate",
+          `Touch path '${t}' matches ${list} pattern '${hit}' — this task must be routed KEEP, not dispatched`,
+          { path: p, list, pattern: hit });
+      }
+    }
+  }
+
+  // Record the baseline (§5).
+  const taskFile = spec.taskId.replace(/[^A-Za-z0-9._-]/g, "_");
+  const state = {
+    task: spec.taskId,
+    spec_path: specPath,
+    spec_sha256: sha256(specText),
+    base_sha: git("rev-parse", "HEAD"),
+    dispatched_at: new Date().toISOString(),
+  };
+  fs.mkdirSync(".lanes/state", { recursive: true });
+  const statePath = `.lanes/state/${taskFile}.json`;
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + "\n");
+  console.log(JSON.stringify({ ok: true, task: spec.taskId, base_sha: state.base_sha, state_path: statePath }));
+}
+
 // ---------------------------------------------------------------- CLI
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -222,6 +333,7 @@ function argOf(flag) {
 
 try {
   if (cmd === "selftest") runSelftest();
+  else if (cmd === "gate") runGate(argOf("--spec"));
   else {
     console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | selftest>");
     process.exit(1);
