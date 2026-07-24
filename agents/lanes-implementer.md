@@ -39,12 +39,20 @@ report BLOCKED immediately — you do not accept freehand tasks.
 
 Read the spec and check, in order:
 
-1. **Model hint is not `keep`.** If the spec's Meta says
-   `Model hint: keep`, report BLOCKED immediately — that marks a
-   security-routed task (auth/authz/availability-gate/schema) that must
-   go to a KEEP implementer, never to the DELEGATE backend. Being handed
-   one means the dispatch was mis-routed; do not proceed to any other
-   check.
+1. **Run the deterministic gate.** Execute (Bash):
+
+       node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" gate --spec <spec-file-path>
+
+   Exit 0 → the gate has verified routing (`Model hint` is not `keep`),
+   the security boundary (no Touch path matches the project's
+   `security_routed` / `do_not_touch` lists — matching semantics:
+   `${CLAUDE_PLUGIN_ROOT}/docs/PATH-MATCHING.md`), and a clean baseline,
+   and has recorded the git baseline to `.lanes/state/`. Proceed.
+   Any other exit → report BLOCKED immediately with the gate's JSON
+   `reason` as BLOCKED_REASON. Never second-guess a gate failure, never
+   re-derive its checks by hand, and do not proceed to any other item.
+   (The same gate also runs as a PreToolUse hook on the dispatch tool —
+   a denied dispatch is the gate firing; report BLOCKED, do not retry.)
 2. **Acceptance test command exists and is runnable.** Actually run it
    (Bash). Expected outcome: it FAILS (red), because the task isn't done
    yet — or the spec's first Touch entry is creating the test. If the
@@ -81,18 +89,28 @@ Call the `dispatch_tool` named in `.lanes/config.md` (v1:
 
 - **Prompt**: the ENTIRE spec file content, verbatim, prefixed with exactly:
 
+      LANES-SPEC: <repo-relative path to the spec file>
+
       You are implementing a single scoped task. The spec below is your
       complete contract. Follow it literally. Do not modify any file not
       listed under "Touch". Do not add features, options, refactors, or
-      documentation beyond the spec. When done, run the Acceptance test
-      command and include its output. If the spec is impossible to satisfy
-      as written, stop and explain instead of improvising.
+      documentation beyond the spec. Never run any git command that
+      writes — no commit, branch, checkout, merge, rebase, reset, stash,
+      or tag. Leave every change uncommitted in the working tree; the
+      controller owns git state. When done, run the Acceptance test
+      command and include its output. If the spec is impossible to
+      satisfy as written, stop and explain instead of improvising.
 
       <spec content>
 
   Do not summarize, reorder, or "improve" the spec. Verbatim means verbatim —
   the spec file is the audit trail, and any delta between file and prompt
   breaks the reviewer's ability to diff result against contract.
+
+  The `LANES-SPEC:` first line is the machine-readable header the
+  plugin's PreToolUse hook parses to hard-gate the dispatch. Omitting it
+  makes the call look like non-Lanes traffic and bypasses the gate —
+  never omit or reword it.
 
 - **Parameters**: sandbox: workspace-write; approval-policy set from the
   project's `approval_mode` (`.lanes/config.md`): `pilot` → on-request,
@@ -111,10 +129,20 @@ BLOCKED with the question as the BLOCKED_REASON.
 
 After the backend returns, regardless of what it claims:
 
-1. `git status` / `git diff --stat` — build the actual changed-file list.
-2. **Scope check**: every changed file must be in the Touch list. Any
-   file outside it — even a whitespace change, even if tests pass — is a
-   scope violation. Do not revert it yourself; report it.
+1. Run the deterministic audit (Bash):
+
+       node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" audit --task <task-id>
+
+   Its JSON report is the changed-file evidence, covering all four
+   surfaces — commits past the recorded baseline, staged, unstaged, and
+   untracked. Do not build the list from `git status` yourself; raw
+   working-tree inspection misses delegate commits.
+2. **Scope check** — read the report: every `out_of_scope` path, every
+   `forbidden` path, and every entry in `commits_past_base` is a
+   violation (the delegate must leave all changes uncommitted; a commit
+   is a violation in itself). `allowlisted` paths are pipeline-owned
+   artifacts and are not violations. Do not revert anything yourself;
+   list every violation under DEVIATIONS.
 3. Run the **Acceptance test command** yourself with Bash. Capture output.
 4. Run the **Regression guard** command yourself — the project's
    `command_prefix` + `test` command (`.lanes/config.md`). Capture output.
@@ -127,7 +155,7 @@ After the backend returns, regardless of what it claims:
 Return exactly the spec's Report Format:
 
     STATUS: DONE | BLOCKED | RATE_LIMITED
-    FILES_CHANGED: <from git, one line each — NOT from the backend's claims>
+    FILES_CHANGED: <from the audit report (in_scope + out_of_scope + forbidden), one line each — NOT from the backend's claims>
     TEST_OUTPUT: <last 20 lines of the acceptance command AS YOU RAN IT>
     DEVIATIONS: <scope violations, interface mismatches, anything the
       backend did differently than specified — or "none">

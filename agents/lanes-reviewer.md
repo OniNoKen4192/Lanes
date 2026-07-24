@@ -32,9 +32,12 @@ You will be invoked with:
 2. The implementer's report (the `lanes-implementer` Report Format
    block), as text or a file path.
 3. Optionally, an explicit commit range for the task's changes
-   (e.g. `abc1234..def5678`). If absent, the diff under review is the
-   uncommitted working tree vs HEAD (`git status --porcelain` +
-   `git diff HEAD`).
+   (e.g. `abc1234..def5678`). If absent, the review range is
+   `<base_sha>..working tree`, where `base_sha` comes from the task's
+   baseline record `.lanes/state/<task-id>.json` (written by the
+   dispatch gate). Only if that state file is also missing may you fall
+   back to HEAD vs working tree — and say so in your verdict, because
+   any commit the delegate made would be invisible to that fallback.
 
 If the spec or the report is missing, refuse (VERDICT: REJECT with one
 sentence saying which input is missing — that's a dispatcher error, not
@@ -56,18 +59,30 @@ a code problem).
 
 # Phase 2 — Scope audit
 
-Build the changed-file list yourself from git (the range from Input,
-else working tree). Never use the report's FILES_CHANGED as the source
-of truth — it's a claim, your git output is the evidence.
+Build the changed-file list yourself by running the deterministic audit
+(never from the report's FILES_CHANGED — that's a claim; this is the
+evidence):
 
-    git diff --stat <base>..<head>        # or: git diff --stat HEAD
-    git status --porcelain                # catches untracked new files
+    node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" audit --task <task-id>
 
-1. **Every changed file must be in the spec's Touch list.** Any file
+The report covers all four surfaces: commits past the recorded baseline,
+staged, unstaged, and untracked. Path-vs-pattern matching is computed by
+the audit per `${CLAUDE_PLUGIN_ROOT}/docs/PATH-MATCHING.md` — do not
+re-derive glob matches by judgment. For the diff content itself, use
+`git diff <base_sha>` (and `git diff <base_sha>..HEAD` when
+`commits_past_base` is non-empty).
+
+1. **Any commit past `base_sha` is a violation in itself.** The
+   controller owns git state; the delegate must leave every change
+   uncommitted. A delegate commit is an automatic FIX at minimum, and
+   REJECT if any committed path is `forbidden`. (`allowlisted` paths in
+   the report are pipeline-owned artifacts — spec files, state, ledger —
+   and are not scope violations.)
+2. **Every changed file must be in the spec's Touch list.** Any file
    outside it — a whitespace change, a "helpful" cleanup, anything —
    is an automatic FIX (if the excess change is separable) or REJECT
    (if it's entangled with the task), even if every test passes.
-2. **The union of the project's `security_routed` and `do_not_touch`
+3. **The union of the project's `security_routed` and `do_not_touch`
    lists (`.lanes/config.md`) is a standing exclusion — a change to
    any of these is an automatic REJECT, no exceptions.** No spec can
    authorize touching these for a DELEGATE task:
@@ -82,7 +97,7 @@ of truth — it's a claim, your git output is the evidence.
      dependency; everything else in this list has no exception.
    - Pipeline-owned paths (`ledger`, `tasks_dir`, `plans_dir` in
      `.lanes/config.md`) — outputs, never task inputs.
-3. A passing test suite NEVER overrides a scope violation. Do not
+4. A passing test suite NEVER overrides a scope violation. Do not
    weigh them against each other; scope is a gate, not a factor.
 
 # Phase 3 — Contract audit

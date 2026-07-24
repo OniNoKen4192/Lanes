@@ -211,7 +211,7 @@ End with, in this order:
 4. **Mismatches/frictions** — anything in TEMPLATE.md, AGENTS.md,
    `.lanes/config.md`, or `agents/lanes-implementer.md` that disagreed with
    reality (the package manifest wins). Report only; never edit them.
-5. **Reminder to the user**: commit the emitted specs before dispatching —
-   an uncommitted spec under the project's `tasks_dir` shows up in the
-   reviewer's `git status --porcelain` scope audit and reads as a
-   violation. Dispatch order must respect Depends on.
+5. **Reminder to the user**: dispatch order must respect Depends on.
+   (Uncommitted spec files under `tasks_dir` are fine — the dispatch
+   gate's baseline allowlist covers pipeline-owned paths, and the audit
+   reports them as `allowlisted`, never as scope violations.)
