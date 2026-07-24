@@ -64,7 +64,8 @@ function parseConfig(text) {
   let currentList = null;
   for (const raw of stripped.split(/\r?\n/)) {
     const line = raw.replace(/\s#.*$/, "").trimEnd();
-    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    if (!line.trim()) continue;                 // a blank line keeps the open list open
+    if (line.trimStart().startsWith("#")) { currentList = null; continue; } // a heading closes it
     const item = line.match(/^\s+-\s+(.+)$/);
     if (item && currentList) { lists[currentList].push(item[1].trim()); continue; }
     const kv = line.match(/^([a-z_]+):\s*(.*)$/);
@@ -149,6 +150,9 @@ security_routed:
 do_not_touch:
   - pnpm-lock.yaml
   - .env
+
+## Notes
+  - stray item that must NOT join any list
 
 tasks_dir: docs/superpowers/tasks
 `;
