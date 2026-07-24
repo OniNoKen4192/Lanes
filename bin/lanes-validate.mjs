@@ -227,7 +227,8 @@ function sha256(buf) {
 function statusPaths(line) {
   const unquote = (s) => s.replace(/^"(.*)"$/, "$1");
   const body = line.slice(3);
-  return (body.includes(" -> ") ? body.split(" -> ") : [body])
+  const isRenameOrCopy = /[RC]/.test(line.slice(0, 2));
+  return (isRenameOrCopy && body.includes(" -> ") ? body.split(" -> ") : [body])
     .map((s) => normalizePath(unquote(s)));
 }
 
@@ -245,6 +246,24 @@ function submodulePaths() {
 function gateFail(check, reason, details = {}) {
   console.log(JSON.stringify({ ok: false, check, reason, ...details }));
   process.exit(2);
+}
+
+// Fail-closed containment per PATH-MATCHING.md rule 5: resolve the deepest
+// lstat-existing ancestor of p (following every intermediate symlink) and
+// require it to stay inside the repo root. Unresolvable (e.g. dangling
+// symlink) is a refusal, not a pass.
+function resolvedInsideRepo(p, rootReal) {
+  const lexists = (q) => { try { fs.lstatSync(q); return true; } catch { return false; } };
+  let deepest = p;
+  while (deepest && !lexists(deepest)) {
+    const parent = path.dirname(deepest);
+    if (parent === deepest) break;
+    deepest = parent;
+  }
+  let real;
+  try { real = normalizePath(fs.realpathSync(deepest)).toLowerCase(); }
+  catch { return false; }
+  return real === rootReal || real.startsWith(rootReal + "/");
 }
 
 function runGate(specPathArg) {
@@ -285,18 +304,16 @@ function runGate(specPathArg) {
 
   // Security gate + path hygiene on every Touch path (§3.1 check 5, §6).
   const submodules = submodulePaths();
+  const rootReal = normalizePath(fs.realpathSync(root)).toLowerCase();
   for (const t of spec.touch) {
     const p = normalizePath(t);
-    if (path.isAbsolute(p) || /(^|\/)\.\.(\/|$)/.test(p)) {
+    if (path.isAbsolute(p) || p.includes(":") || /(^|\/)\.\.(\/|$)/.test(p)) {
       gateFail("security_gate", `Touch path escapes the repo: ${t}`);
     }
     const sub = matchAny(submodules, p);
     if (sub) gateFail("security_gate", `Touch path is inside submodule '${sub}': ${t}`);
-    if (fs.existsSync(p) && fs.lstatSync(p).isSymbolicLink()) {
-      const real = normalizePath(fs.realpathSync(p)).toLowerCase();
-      if (!real.startsWith(normalizePath(root).toLowerCase() + "/")) {
-        gateFail("security_gate", `Touch path is a symlink resolving outside the repo: ${t}`);
-      }
+    if (!resolvedInsideRepo(p, rootReal)) {
+      gateFail("security_gate", `Touch path resolves outside the repo (symlink escape or unresolvable): ${t}`);
     }
     for (const [list, patterns] of [["security_routed", config.security_routed], ["do_not_touch", config.do_not_touch]]) {
       const hit = matchAny(patterns, p);
