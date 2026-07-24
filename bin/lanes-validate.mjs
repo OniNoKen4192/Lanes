@@ -215,7 +215,9 @@ function runSelftest() {
 // ---------------------------------------------------------------- git
 
 function git(...args) {
-  return execFileSync("git", args, { encoding: "utf8" }).trimEnd();
+  // core.quotepath=false makes git print non-ASCII paths verbatim instead of
+  // octal-escaped + quoted, so path classification sees the real names.
+  return execFileSync("git", ["-c", "core.quotepath=false", ...args], { encoding: "utf8" }).trimEnd();
 }
 
 function sha256(buf) {
