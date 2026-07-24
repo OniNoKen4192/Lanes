@@ -12,14 +12,18 @@ is the matching authority.
 1. **Normalization.** Paths are repo-relative (relative to the git
    toplevel, not `app_subdir`). `\` is normalized to `/`. A leading `./`
    is stripped; trailing `/` is stripped. A path containing `..` or an
-   absolute path is refused outright (it escapes the repo).
+   absolute path is refused outright (it escapes the repo). So is any
+   path containing `:` — repo-relative paths never legally contain a
+   colon (this also rejects Windows drive-relative forms like
+   `C:temp/x` and NTFS alternate data streams).
 2. **Case-insensitive.** Matching ignores case. A security deny-list
    must not be dodgeable via `SRC/Auth.ts` on the case-insensitive
    filesystems most users run (Windows, macOS).
 3. **Dialect.**
    - `*` matches within one segment (never crosses `/`).
    - `?` matches exactly one non-`/` character.
-   - `**` crosses segments; a leading `**/` also matches zero segments.
+   - `**` crosses segments; a `**/` component (leading or mid-pattern)
+     also matches zero segments.
    - `dir/**` matches everything strictly beneath `dir`, not `dir` itself.
    - A **literal pattern** (no `*`/`?`) matches the named path itself
      **and everything beneath it** — `prisma/migrations` behaves like

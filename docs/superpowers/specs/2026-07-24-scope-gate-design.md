@@ -63,12 +63,15 @@ The pre-dispatch check. Verifies, in order:
 1. **Config** — `.lanes/config.md` exists and its `security_routed` and
    `do_not_touch` lists parse (minimal, targeted parse of today's markdown
    config; the full schema migration is #5).
-2. **Clean baseline** — `git status --porcelain` is empty except for paths
-   under the allowlist: `.lanes/**` plus the configured plans/tasks dirs.
-3. **Spec structure** — the spec file parses far enough to extract Task ID,
-   Model hint, and the Touch / Do-NOT-touch lists.
-4. **Routing law** — Model hint is not `keep` (a keep-hinted spec must
+2. **Spec structure & containment** — the spec file parses far enough to
+   extract Task ID, Model hint, and the Touch / Do-NOT-touch lists; the
+   spec path itself must resolve inside the repo (no absolute path, `..`,
+   drive letter, or symlink escape — the gate is worthless if the spec it
+   reads can live outside the tree it's protecting).
+3. **Routing law** — Model hint is not `keep` (a keep-hinted spec must
    never reach a DELEGATE dispatch).
+4. **Clean baseline** — `git status --porcelain` is empty except for paths
+   under the allowlist: `.lanes/**` plus the configured plans/tasks dirs.
 5. **Security gate (the #2 fix)** — no Touch path matches any pattern in
    `security_routed` or `do_not_touch`, under the §6 matching semantics.
    The report names the exact pattern and path on a hit.
@@ -133,7 +136,10 @@ unparseable config, unreadable spec → block (gate) or `verdict:
 A PreToolUse hook registered in the plugin's `hooks` configuration,
 matching the configured dispatch tool (v1: `mcp__codex__codex`). The hook
 script (also plain Node, in `hooks/`) reads the tool-call input from
-stdin.
+stdin. The `hooks.json` `matcher` value is therefore part of the backend
+seam defined in `agents/lanes-implementer.md`: it must change in
+lockstep with the dispatch tool, or the PreToolUse hard gate silently
+stops firing on the new tool.
 
 **Contract:** the implementer's dispatch prompt gains one machine-readable
 first line:
@@ -157,13 +163,27 @@ Written by `gate`, read by `audit` and the reviewer:
   "task": "T12",
   "spec_path": "tasks/T12-slugify.md",
   "spec_sha256": "…",
+  "touch": ["src/foo.ts"],
   "base_sha": "abc1234",
   "dispatched_at": "2026-07-24T15:00:00Z"
 }
 ```
 
 `spec_sha256` lets the audit detect a spec edited after dispatch (relevant
-to #8 later). `.lanes/state/` joins the baseline allowlist.
+to #8 later). The `touch` array is a snapshot of the spec's Touch list at
+dispatch time; `audit` classifies changed paths against this snapshot, not
+against the live spec file — otherwise a delegate (or anyone) could edit
+the spec's Touch table after the fact to launder an out-of-scope change
+into "in scope" retroactively, and `spec_modified` becoming `true` is what
+surfaces that tamper to the reviewer. `.lanes/state/` joins the baseline
+allowlist.
+
+**Known limitation.** `.lanes/state/` sits inside the delegate's writable
+sandbox, so a delegate could in principle tamper with the baseline record
+itself (including the `touch` snapshot), not just the spec. This residual
+trust boundary is accepted for this slice; it closes fully with worktree
+isolation (#3), which moves state out of any sandbox the delegate can
+write to.
 
 ## 6. Path-matching semantics (`docs/PATH-MATCHING.md`)
 

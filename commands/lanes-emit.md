@@ -183,6 +183,12 @@ Before writing each spec file, two consistency checks:
 
 Walk every emitted spec through `${CLAUDE_PLUGIN_ROOT}/agents/lanes-implementer.md`'s Phase 1
 items, as that agent would:
+The implementer's real Phase 1 now begins with the deterministic gate
+(`lanes-validate.mjs gate`), which also enforces the security boundary
+and a clean baseline at dispatch time; the emitter does NOT run the gate
+(it would write premature state files and impose the clean-baseline
+requirement at emit time) — these five static checks remain the
+emit-time approximation.
 
 1. Model hint is not `keep` (should be true by construction).
 2. Acceptance command is runnable — actually run it with Bash. Expect red,

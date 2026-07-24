@@ -87,9 +87,11 @@ Once the plan is approved:
 1. Run `/lanes-emit <plan>` to compile it: it emits one spec file per
    DELEGATE-routed task into the project's `tasks_dir`, validating each
    task's lane against `ROUTING.md` along the way.
-2. **Commit the emitted specs before dispatching.** An uncommitted spec
-   under `tasks_dir` reads as a scope violation when `lanes-reviewer` later
-   audits `git status --porcelain`.
+2. **Dispatch order must respect `Depends on`.** Uncommitted specs under
+   `tasks_dir` are fine — the dispatch gate's baseline allowlist covers
+   pipeline-owned paths, and the audit reports them as `allowlisted`,
+   never as scope violations. Commit specs whenever convenient for
+   history.
 3. Dispatch each DELEGATE spec to `lanes-implementer`. Its report — spec
    path plus the report content — is then dispatched to `lanes-reviewer`.
 4. KEEP tasks proceed via normal superpowers execution (no spec, no

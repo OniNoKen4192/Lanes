@@ -272,12 +272,17 @@ function runGate(specPathArg) {
   if (!specPathArg) { console.error("gate: --spec <path> required"); process.exit(1); }
   const root = git("rev-parse", "--show-toplevel");
   process.chdir(root);
+  const rootReal = normalizePath(fs.realpathSync(root)).toLowerCase();
 
   let config;
   try { config = loadConfig(); } catch (err) { gateFail("config", String(err.message || err)); }
 
   const specPath = normalizePath(specPathArg);
   if (!fs.existsSync(specPath)) gateFail("spec", `spec file not found: ${specPath}`);
+  if (path.isAbsolute(specPath) || specPath.includes(":") || /(^|\/)\.\.(\/|$)/.test(specPath)
+      || !resolvedInsideRepo(specPath, rootReal)) {
+    gateFail("spec", `spec path is outside the repo: ${specPathArg}`);
+  }
   const specText = fs.readFileSync(specPath, "utf8");
   const spec = parseSpec(specText);
   if (!spec.taskId) gateFail("spec", "spec has no '**Task ID**:' entry in Meta");
@@ -306,7 +311,6 @@ function runGate(specPathArg) {
 
   // Security gate + path hygiene on every Touch path (§3.1 check 5, §6).
   const submodules = submodulePaths();
-  const rootReal = normalizePath(fs.realpathSync(root)).toLowerCase();
   for (const t of spec.touch) {
     const p = normalizePath(t);
     if (path.isAbsolute(p) || p.includes(":") || /(^|\/)\.\.(\/|$)/.test(p)) {
@@ -333,6 +337,7 @@ function runGate(specPathArg) {
     task: spec.taskId,
     spec_path: specPath,
     spec_sha256: sha256(specText),
+    touch: spec.touch.map(normalizePath),
     base_sha: git("rev-parse", "HEAD"),
     dispatched_at: new Date().toISOString(),
   };
@@ -357,8 +362,12 @@ function runAudit(taskIdArg) {
     process.exit(2);
   }
   const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  if (!Array.isArray(state.touch)) {
+    console.log(JSON.stringify({ task: state.task, verdict: "violations",
+      error: "state file has no touch snapshot — re-run gate (state predates it or was tampered)" }));
+    process.exit(2);
+  }
   const specText = fs.readFileSync(state.spec_path, "utf8");
-  const spec = parseSpec(specText);
 
   // All four surfaces (§3.2): committed, staged, unstaged, untracked.
   const changed = new Set();
@@ -393,14 +402,14 @@ function runAudit(taskIdArg) {
       report.forbidden.push({ path: p, list: secHit ? "security_routed" : "do_not_touch", pattern: secHit || dntHit });
     } else if (matchAny(allowlist, p)) {
       report.allowlisted.push(p);
-    } else if (matchAny(spec.touch, p)) {
+    } else if (matchAny(state.touch, p)) {
       report.in_scope.push(p);
     } else {
       report.out_of_scope.push(p);
     }
   }
   report.verdict =
-    (report.forbidden.length || report.out_of_scope.length || report.commits_past_base.length)
+    (report.forbidden.length || report.out_of_scope.length || report.commits_past_base.length || report.spec_modified)
       ? "violations" : "clean";
   console.log(JSON.stringify(report, null, 2));
   process.exit(report.verdict === "clean" ? 0 : 2);

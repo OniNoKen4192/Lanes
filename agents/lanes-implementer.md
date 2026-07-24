@@ -20,7 +20,10 @@ Phase 2, plus the `tools:` line above and the `dispatch_tool` /
 `.lanes/config.md`. Everything else in this agent — the validation gate,
 the verbatim-spec rule, the verification phase, the report format — is
 backend-agnostic. A second backend replaces the SEAM block, those four
-config fields, and this file's `tools:` line; nothing else changes. -->
+config fields, this file's `tools:` line, and the `matcher` value in the
+plugin's `hooks/hooks.json` (the PreToolUse hard gate must follow the
+dispatch tool — leaving it on the old tool name silently disables the
+gate); nothing else changes. -->
 
 You are a dispatch-and-verify agent. You do not implement anything
 yourself. Your job: validate the spec, hand it to the DELEGATE backend
@@ -81,8 +84,11 @@ bug; patching it here hides the bug.
 Everything in this block is the one place a delegate backend's specifics
 are allowed to appear. A second backend replaces ONLY this block, the
 `dispatch_tool` / `reply_tool` / `approval_mode` / `ratelimit_signal`
-fields in `.lanes/config.md`, and the corresponding tool names in this
-agent's `tools:` frontmatter — nothing else in this file changes.
+fields in `.lanes/config.md`, the corresponding tool names in this
+agent's `tools:` frontmatter, and the `matcher` value in the plugin's
+`hooks/hooks.json` (the PreToolUse hard gate must follow the dispatch
+tool — leaving it on the old tool name silently disables the gate) —
+nothing else in this file changes.
 
 Call the `dispatch_tool` named in `.lanes/config.md` (v1:
 `mcp__codex__codex`) with:
