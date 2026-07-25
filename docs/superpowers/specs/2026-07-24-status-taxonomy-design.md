@@ -27,7 +27,7 @@ hook code is touched.
 | `IMPLEMENTED` | Acceptance + regression pass, audit verdict `clean`, `DEVIATIONS: none` | Reviewer |
 | `IMPLEMENTED_WITH_DEVIATIONS` | Work finished; deviations (scope violations, interface mismatches, anything done differently than specified) fully listed for reviewer ruling | Reviewer |
 | `BLOCKED` | Spec gap, environment failure, or the backend declared the spec unsatisfiable | Planner |
-| `BACKEND_FAILURE` | The dispatch tool errored or crashed in a way that does not match the project's `ratelimit_signal` | Dispatcher |
+| `BACKEND_FAILURE` | The dispatch tool (or reply tool) errored or crashed in a way that does not match the project's `ratelimit_signal`. A dispatch denied by the Lanes gate is the gate firing — Phase 1 BLOCKED, not a backend failure | Dispatcher |
 | `RATE_LIMITED` | The dispatch tool's response matches the project's `ratelimit_signal` | Dispatcher |
 
 Decisions settled in brainstorming:
@@ -52,7 +52,7 @@ intake refusal (REJECT with a routing reason), exactly as it refuses
 BLOCKED today. `APPROVE` remains the only state in the whole pipeline that
 means "accepted work."
 
-## 4. Lockstep changes (six surfaces)
+## 4. Lockstep changes (seven surfaces)
 
 1. **`agents/lanes-implementer.md`** — Phase 4 status line becomes the
    five statuses; the STATUS rules are rewritten so the "OR violations
@@ -82,7 +82,11 @@ means "accepted work."
    ``DONE` / `BLOCKED` / `RATE_LIMITED`` (agent list, item 3) becomes the
    five statuses; item 4's "a `DONE` report" becomes "an
    `IMPLEMENTED` / `IMPLEMENTED_WITH_DEVIATIONS` report".
-6. **`README.md`** — same two prose updates in pipeline steps 3–4.
+6. **`README.md`** — the same prose update in pipeline step 3 (step 4
+   never named the implementer statuses).
+7. **`templates/config.example.md`** — the `ratelimit_signal` comment's
+   "instead of reporting a false BLOCKED" becomes "instead of getting a
+   false BACKEND_FAILURE".
 
 Wherever the taxonomy is enumerated, the list is byte-identical:
 `IMPLEMENTED | IMPLEMENTED_WITH_DEVIATIONS | BLOCKED | BACKEND_FAILURE |

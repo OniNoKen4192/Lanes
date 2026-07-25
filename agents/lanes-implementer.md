@@ -180,11 +180,13 @@ STATUS rules:
 - **BLOCKED**: spec gap, environment failure, or the backend declared the
   spec unsatisfiable. Include the backend's explanation verbatim if it
   gave one.
-- **BACKEND_FAILURE**: the `dispatch_tool` errored or crashed and the
-  response does NOT match the project's `ratelimit_signal`
-  (`.lanes/config.md`). Report immediately with the error text verbatim.
-  Do NOT retry, do NOT fall back to implementing it yourself — the
-  dispatcher owns rerouting.
+- **BACKEND_FAILURE**: the `dispatch_tool` or `reply_tool` errored or
+  crashed and the response does NOT match the project's
+  `ratelimit_signal` (`.lanes/config.md`). Report immediately with the
+  error text verbatim. Do NOT retry, do NOT fall back to implementing
+  it yourself — the dispatcher owns rerouting. (A dispatch denied by
+  the Lanes gate is the gate firing — that is a Phase 1 BLOCKED, not a
+  backend failure.)
 - **RATE_LIMITED**: the `dispatch_tool`'s response matches the project's
   `ratelimit_signal` (`.lanes/config.md`) — a rate-limit / usage-cap /
   429-class error. Report immediately with the error text. Do NOT retry,
