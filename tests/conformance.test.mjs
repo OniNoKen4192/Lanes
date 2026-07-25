@@ -71,7 +71,19 @@ test("§5.3 frontmatter", () => {
     const closeIdx = content.indexOf("\n---", 4);
     assert.ok(closeIdx !== -1, `${f} frontmatter should be closed with a second ---`);
     const front = content.slice(0, closeIdx);
-    assert.ok(front.includes("description:"), `${f} frontmatter should contain description:`);
+    const descMatch = front.match(/^description:\s*(.*)$/m);
+    assert.ok(descMatch, `${f} frontmatter should contain description:`);
+    const descValue = descMatch[1].trim();
+    if (descValue === "" || descValue === ">") {
+      const after = front.slice(front.indexOf(descMatch[0]) + descMatch[0].length);
+      const nextLine = after.split("\n")[1] ?? "";
+      assert.ok(
+        nextLine.trim().length > 0,
+        `${f} frontmatter description: should have non-empty content on the following line`
+      );
+    } else {
+      assert.ok(descValue.length > 0, `${f} frontmatter description: should be non-empty`);
+    }
     if (nameRequired.has(f)) {
       assert.ok(front.includes("name:"), `${f} frontmatter should contain name:`);
     }
@@ -88,7 +100,8 @@ test("§5.4 cross-references resolve", () => {
     const content = read(f);
     for (const m of content.matchAll(re)) {
       checked++;
-      const captured = m[1];
+      let captured = m[1];
+      captured = captured.replace(/\.$/, "");
       assert.ok(
         fs.existsSync(path.join(repoRoot, captured)),
         `${f}: \${CLAUDE_PLUGIN_ROOT}/${captured} should resolve to an existing file`

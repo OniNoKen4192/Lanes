@@ -55,7 +55,7 @@ Decisions (mine, per the standing delegation):
   `pipeline` dirs `docs/plans`, `docs/tasks`, ledger `docs/progress.md`),
   a `package.json` with a `test` script, `src/lib/thing.js`, and a
   TEMPLATE-conformant spec file at `docs/tasks/T1.md` (Task ID `T1`,
-  Model hint `luna`, Touch: `src/lib/thing.js` + a test file). `opts`
+  Model hint `beta`, Touch: `src/lib/thing.js` + a test file). `opts`
   overrides let a test patch config fields or the spec text before commit.
 - `validate(dir, ...args) → { status, stdout, json }`: spawns
   `node <repo>/bin/lanes-validate.mjs <args>` with cwd `dir`, captures

@@ -11,7 +11,7 @@ export const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)
 const VALIDATOR = path.join(repoRoot, "bin", "lanes-validate.mjs");
 
 export function read(relPath) {
-  return fs.readFileSync(path.join(repoRoot, relPath), "utf8");
+  return fs.readFileSync(path.join(repoRoot, relPath), "utf8").replaceAll("\r\n", "\n");
 }
 
 export const FIXTURE_CONFIG = {
@@ -81,10 +81,11 @@ export function makeFixtureRepo(opts = {}) {
 export function validate(dir, ...args) {
   try {
     const stdout = execFileSync(process.execPath, [VALIDATOR, ...args], { cwd: dir, encoding: "utf8" });
-    return { status: 0, stdout, json: tryParse(stdout) };
+    return { status: 0, stdout, stderr: "", json: tryParse(stdout) };
   } catch (err) {
     const stdout = String(err.stdout || "");
-    return { status: err.status ?? -1, stdout, json: tryParse(stdout) };
+    const stderr = String(err.stderr || "");
+    return { status: err.status ?? -1, stdout, stderr, json: tryParse(stdout) };
   }
 }
 

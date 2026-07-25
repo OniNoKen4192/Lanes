@@ -241,5 +241,6 @@ describe("doctor: clean fixture is ok", () => {
     assert.ok(authEntry, `expected a patterns entry for 'src/auth.ts', got: ${JSON.stringify(r.json.checks.globs.patterns)}`);
     assert.equal(authEntry.matches, 1);
     assert.equal(r.json.checks.commands.commands.length, 4);
+    assert.ok(r.json.checks.commands.commands.every((c) => ["pass", "warn"].includes(c.status)));
   });
 });
