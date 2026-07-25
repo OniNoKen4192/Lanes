@@ -154,6 +154,21 @@ BLOCKED_REASON: <only if BLOCKED: what was needed that the spec didn't provide>
 
 ---
 
+## Amendments (created at first use — never authored at emission)
+
+Emitted specs do not include an `## Amendments` section. The first
+accepted deviation creates it at the end of the file; every entry is
+appended by the controller from the reviewer's SPEC_UPDATE, and the
+sections above the marker are never edited after dispatch. The
+validator hashes only the content above the marker (`spec_sha256` in
+the baseline record), so appending amendments never trips the audit's
+`spec_modified` tamper check — editing the original contract still
+does. Machine enforcement (the audit's Touch snapshot) keys on
+dispatch-time state; amendments are the human-readable record of how
+the contract evolved: hash of the original, verdict reference, the
+deviation, the acceptance rationale, affected paths, and replacement
+acceptance criteria when they changed.
+
 ## Planner Emission Rules (for the planner, KEEP lane)
 
 1. **One task = one reviewable diff.** If the Touch list exceeds ~4 files or
@@ -203,8 +218,10 @@ success is not evidence; the test output is.
    fail, even if tests pass
 2. Acceptance criteria each traceable to a test in the diff
 3. Interfaces match the spec exactly — names, types, error contracts
-4. DEVIATIONS section reviewed: each deviation either accepted (and the spec
-   file updated to match) or rejected (task returns to fixer with a delta spec)
+4. DEVIATIONS section reviewed: each deviation either accepted (recorded
+   as an appended `## Amendments` entry — the original sections are
+   immutable after dispatch) or rejected (task returns to fixer with a
+   delta spec)
 5. Full unit test suite run (`<command_prefix> <test>`), plus the project's
    e2e/UX suite for every workflow ID listed in the spec's "Affected
    workflow IDs" (`<command_prefix> <review_suite.suite_command>

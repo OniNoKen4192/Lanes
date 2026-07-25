@@ -364,3 +364,29 @@ test("§5.11 fixture leakage", () => {
     assert.ok(!/\bWIX\b/.test(content), `${f} should not mention the WIX token`);
   }
 });
+
+// ------------------------------------------------------------ §5.12
+
+test("§5.12 amendments discipline", () => {
+  // Reviewer file: includes `## Amendments` and `Original sha256` and
+  // does NOT include the retired `old text, new text` edit format
+  const reviewer = read("agents/lanes-reviewer.md");
+  assert.ok(reviewer.includes("`## Amendments`"), "reviewer should reference `## Amendments`");
+  assert.ok(reviewer.includes("Original sha256"), "reviewer should reference 'Original sha256'");
+  assert.ok(
+    !reviewer.includes("old text,\n      new text"),
+    "reviewer should not include the retired edit-format phrase 'old text,\\n      new text'"
+  );
+
+  // TEMPLATE.md: includes ## Amendments (created at first use and
+  // Reviewer Checklist item 4 includes 'immutable'
+  const template = read("templates/TEMPLATE.md");
+  assert.ok(
+    template.includes("## Amendments (created at first use"),
+    "TEMPLATE.md should include the '## Amendments (created at first use' section"
+  );
+  assert.ok(
+    template.includes("immutable after dispatch"),
+    "Reviewer Checklist item 4 should include 'immutable after dispatch'"
+  );
+});
