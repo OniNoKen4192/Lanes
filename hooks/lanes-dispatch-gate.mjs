@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 // PreToolUse hook on the DELEGATE dispatch tool (v1: mcp__codex__codex).
-// Contract (design spec §4): a Lanes dispatch prompt's FIRST LINE is a
-// "LANES-SPEC: <path>" header. With that header, run the gate and deny on
-// failure (fail closed). Without it, allow untouched — this hook must
+// Contract (scope-gate spec §4 + worktree spec §5): a Lanes dispatch
+// prompt's FIRST LINE is a "LANES-SPEC: <path>" header, optionally
+// followed by "LANES-WORKTREE: <path>" on line 2 (gate runs in that
+// worktree after a registered-worktree membership check). With the
+// header, run the gate and deny on failure (fail closed). Without it,
+// allow untouched — this hook must
 // never break unrelated codex use (e.g. a prompt that merely quotes the
 // header syntax somewhere past line 1 must not be misidentified).
 
@@ -37,11 +40,42 @@ try {
   if (!header) process.exit(0); // not a Lanes dispatch — allow untouched
 
   const specPath = header[1];
+  // Optional second header line (design spec 2026-07-25-worktree-isolation
+  // §5): LANES-WORKTREE names the controller-created worktree; the gate
+  // then runs THERE. The path must be a registered worktree of this repo
+  // — a prompt must not be able to point the gate at an arbitrary
+  // directory carrying a permissive config. Fail closed throughout.
+  const wtHeader = prompt.match(/^LANES-SPEC:[^\n]*\n[ \t]*LANES-WORKTREE:[ \t]*(.+?)[ \t]*(?:\r?\n|$)/);
+  let gateCwd = input.cwd || process.cwd();
+  if (wtHeader) {
+    const canon = (p) => {
+      const abs = path.resolve(gateCwd, p).replace(/[\\/]+$/, "");
+      return process.platform === "win32" ? abs.toLowerCase() : abs;
+    };
+    let listed;
+    try {
+      listed = execFileSync("git", ["-C", gateCwd, "worktree", "list", "--porcelain"], {
+        encoding: "utf8",
+        timeout: 30_000,
+      });
+    } catch {
+      deny("Lanes gate: cannot enumerate worktrees — dispatch denied (fail closed)");
+    }
+    const registered = listed
+      .split(/\r?\n/)
+      .filter((l) => l.startsWith("worktree "))
+      .map((l) => canon(l.slice("worktree ".length)));
+    const target = canon(wtHeader[1]);
+    if (!registered.includes(target)) {
+      deny(`Lanes gate: LANES-WORKTREE is not a registered worktree of this repo: ${wtHeader[1]}`);
+    }
+    gateCwd = path.resolve(gateCwd, wtHeader[1]);
+  }
   const validator = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "lanes-validate.mjs");
   try {
     execFileSync(process.execPath, [validator, "gate", "--spec", specPath], {
       encoding: "utf8",
-      cwd: input.cwd || process.cwd(),
+      cwd: gateCwd,
       timeout: 30_000,
     });
     process.exit(0); // gate passed — allow
