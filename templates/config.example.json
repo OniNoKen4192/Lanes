@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "project": {
+    "app_subdir": "wisconsin-ice-exchange",
+    "command_prefix": "cd wisconsin-ice-exchange &&"
+  },
+  "commands": {
+    "test": "pnpm vitest run",
+    "lint": "pnpm eslint",
+    "typecheck": "pnpm tsc --noEmit",
+    "acceptance_runner": "pnpm vitest run"
+  },
+  "backend": {
+    "name": "codex-mcp",
+    "dispatch_tool": "mcp__codex__codex",
+    "reply_tool": "mcp__codex__codex-reply",
+    "approval_mode": "pilot",
+    "tiers": ["sol", "terra", "luna"],
+    "ratelimit_signal": ["usage-cap", "429", "rate limit"]
+  },
+  "routing": {
+    "security_routed": [
+      "src/auth.ts",
+      "src/lib/authz.ts",
+      "src/lib/availability.ts",
+      "prisma/schema.prisma",
+      "prisma/migrations/**"
+    ],
+    "do_not_touch": [
+      "src/components/ui/**",
+      "pnpm-lock.yaml",
+      ".env",
+      ".env.example"
+    ]
+  },
+  "review_suite": {
+    "suite_command": "pnpm test:ux",
+    "id_pattern": "<id>-",
+    "id_index": "docs/workflows.md",
+    "route_map": {
+      "src/app/admin/**": ["a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8"],
+      "src/app/org/**": ["o1", "o2", "o3", "o4"],
+      "src/app/teams/**": ["s5", "s6", "s7", "s10", "v2"],
+      "src/app/account/**": ["s11"]
+    }
+  },
+  "pipeline": {
+    "plans_dir": "docs/superpowers/plans",
+    "tasks_dir": "docs/superpowers/tasks",
+    "ledger": ".superpowers/sdd/progress.md"
+  }
+}
