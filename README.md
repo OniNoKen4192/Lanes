@@ -57,7 +57,8 @@ walking skeleton with superpowers first, then come back.
 3. **Dispatch DELEGATE specs to `lanes-implementer`.** It validates the
    spec, hands it to the configured backend verbatim, verifies the result
    itself (scope, acceptance, regression, interfaces — never the backend's
-   word alone), and reports DONE / BLOCKED / RATE_LIMITED.
+   word alone), and reports IMPLEMENTED / IMPLEMENTED_WITH_DEVIATIONS /
+   BLOCKED / BACKEND_FAILURE / RATE_LIMITED.
 4. **Review with `lanes-reviewer`.** Frontier judgment, one verdict:
    APPROVE, FIX (with a delta spec), or REJECT. Scope violations and
    security-routed touches are automatic rejections, no matter how clean

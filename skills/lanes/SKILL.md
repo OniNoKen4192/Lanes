@@ -38,9 +38,11 @@ Four stages, one direction, KEEP and DELEGATE never mixing mid-task:
    spec). Validates the spec, hands it verbatim to the project's configured
    DELEGATE backend, verifies the result itself (scope, acceptance,
    regression, interfaces — never the backend's word alone), and reports
-   `DONE` / `BLOCKED` / `RATE_LIMITED`.
-4. **`lanes-reviewer`** (frontier judgment, KEEP lane). Takes a spec plus a
-   `DONE` report, reruns every check itself, and returns exactly one
+   `IMPLEMENTED` / `IMPLEMENTED_WITH_DEVIATIONS` / `BLOCKED` /
+   `BACKEND_FAILURE` / `RATE_LIMITED`.
+4. **`lanes-reviewer`** (frontier judgment, KEEP lane). Takes a spec plus an
+   `IMPLEMENTED` or `IMPLEMENTED_WITH_DEVIATIONS` report, reruns every
+   check itself, and returns exactly one
    verdict: `APPROVE`, `FIX` (with a delta spec), or `REJECT`.
 
 **KEEP tasks never leave the superpowers inner loop.** A KEEP-routed task in

@@ -160,7 +160,7 @@ After the backend returns, regardless of what it claims:
 
 Return exactly the spec's Report Format:
 
-    STATUS: DONE | BLOCKED | RATE_LIMITED
+    STATUS: IMPLEMENTED | IMPLEMENTED_WITH_DEVIATIONS | BLOCKED | BACKEND_FAILURE | RATE_LIMITED
     FILES_CHANGED: <from the audit report (in_scope + out_of_scope + forbidden), one line each — NOT from the backend's claims>
     TEST_OUTPUT: <last 20 lines of the acceptance command AS YOU RAN IT>
     DEVIATIONS: <scope violations, interface mismatches, anything the
@@ -169,18 +169,28 @@ Return exactly the spec's Report Format:
 
 STATUS rules:
 
-- **DONE** requires: acceptance passes, regression guard passes, and zero
-  scope violations — OR violations exist but are fully listed under
-  DEVIATIONS for the reviewer to rule on. Failing tests are never DONE.
+- **IMPLEMENTED** requires ALL of: acceptance passes, regression guard
+  passes, the audit verdict is `clean`, and DEVIATIONS is "none".
+  Failing tests are never IMPLEMENTED.
+- **IMPLEMENTED_WITH_DEVIATIONS**: acceptance and regression pass, but
+  deviations exist — scope violations, interface mismatches, anything
+  done differently than specified — and every one is listed under
+  DEVIATIONS for the reviewer to rule on. DEVIATIONS must be non-empty;
+  if it would be "none", the status is IMPLEMENTED.
+- **BLOCKED**: spec gap, environment failure, or the backend declared the
+  spec unsatisfiable. Include the backend's explanation verbatim if it
+  gave one.
+- **BACKEND_FAILURE**: the `dispatch_tool` errored or crashed and the
+  response does NOT match the project's `ratelimit_signal`
+  (`.lanes/config.md`). Report immediately with the error text verbatim.
+  Do NOT retry, do NOT fall back to implementing it yourself — the
+  dispatcher owns rerouting.
 - **RATE_LIMITED**: the `dispatch_tool`'s response matches the project's
   `ratelimit_signal` (`.lanes/config.md`) — a rate-limit / usage-cap /
   429-class error. Report immediately with the error text. Do NOT retry,
   do NOT wait, do NOT fall back to implementing it yourself — the
   dispatcher owns rerouting, and you silently coding the task defeats
   the entire point of the pipeline.
-- **BLOCKED**: spec gap, environment failure, or the backend declared the
-  spec unsatisfiable. Include the backend's explanation verbatim if it
-  gave one.
 - **Implementation done but acceptance failing**: you get ONE `reply_tool`
   attempt to have the backend fix it, and only when the failure message
   clearly points at the implementation rather than the spec. If it still
@@ -194,6 +204,6 @@ STATUS rules:
   tests and git inspection, not implementation. If you catch yourself
   about to "just fix" something, that impulse is the report content.
 - Never call the DELEGATE backend without a validated spec.
-- Never mark DONE on the backend's word alone.
+- Never report either IMPLEMENTED status on the backend's word alone.
 - One task per invocation. If the spec smells like two tasks, that's a
   Phase 1 BLOCKED (planner must split it), not something you manage.

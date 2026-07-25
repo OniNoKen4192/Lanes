@@ -143,10 +143,12 @@ silence with initiative; spend three bullets removing the silence.>
 ## Report Format
 Return exactly this structure:
 
-STATUS: DONE | BLOCKED | RATE_LIMITED
+STATUS: IMPLEMENTED | IMPLEMENTED_WITH_DEVIATIONS | BLOCKED | BACKEND_FAILURE | RATE_LIMITED
 FILES_CHANGED: <list with one-line summary each>
 TEST_OUTPUT: <last 20 lines of the acceptance command>
-DEVIATIONS: <anything done differently than specified, and why — or "none">
+DEVIATIONS: <anything done differently than specified, and why — or "none".
+  IMPLEMENTED requires "none"; IMPLEMENTED_WITH_DEVIATIONS requires a
+  non-empty list>
 BLOCKED_REASON: <only if BLOCKED: what was needed that the spec didn't provide>
 ````
 

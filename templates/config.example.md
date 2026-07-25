@@ -31,7 +31,7 @@ tiers: DELEGATE-lane tier names, best→cheapest — /lanes-init defaults to
 the backend's stock tiers; rename here if your project uses different
 labels. ratelimit_signal: substrings that mark a rate-limit/usage-cap
 response as RATE_LIMITED, so the dispatcher knows to fall back a tier
-instead of reporting a false BLOCKED. -->
+instead of getting a false BACKEND_FAILURE. -->
 backend:        codex-mcp
 dispatch_tool:  mcp__codex__codex
 reply_tool:     mcp__codex__codex-reply
