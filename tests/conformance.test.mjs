@@ -388,3 +388,17 @@ test("§5.12 amendments discipline", () => {
     "Reviewer Checklist item 4 should include 'immutable after dispatch'"
   );
 });
+
+// ------------------------------------------------- Roundabout (2026-07-25)
+
+test("roundabout: /lanes-run command structure", () => {
+  const cmd = read("commands/lanes-run.md");
+  assert.ok(cmd.startsWith("---\n"), "lanes-run.md should start with a frontmatter fence");
+  for (const term of [
+    "conveyor", "max_fix_rounds", "REJECT", "BLOCKED", "BACKEND_FAILURE",
+    "RATE_LIMITED", "security-routed", "park", "worktree create", "Task/Lane Map",
+  ]) {
+    assert.ok(cmd.includes(term), `lanes-run.md should mention ${JSON.stringify(term)}`);
+  }
+  assert.ok(!cmd.includes("git push"), "the conveyor must never push to a remote");
+});
