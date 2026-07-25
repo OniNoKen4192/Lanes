@@ -163,8 +163,9 @@ With the floor clear and no existing config in the way:
 2. Write `.lanes/config.json` as a schema-v1 JSON file in exactly the
    `config.example.json` shape (`schema_version: 1` and the `project`,
    `commands`, `backend`, `routing`, `pipeline` blocks; `review_suite` and
-   `automation` are the two blocks that may be omitted entirely when Phase 2
-   confirms there is no suite), with the illustrative example values replaced by
+   `automation` are the two blocks that may be omitted entirely — `review_suite`
+   when Phase 2 confirms there is no suite, `automation` for today's
+   fully-manual default), with the illustrative example values replaced by
    this project's inferred-and-confirmed values from Phases 1–2. JSON
    carries no comments — the guidance lives in `config.example.md`; do
    not try to embed commentary. `backend.ratelimit_signal` is an array of
