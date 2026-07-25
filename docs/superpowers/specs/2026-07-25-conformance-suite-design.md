@@ -18,7 +18,10 @@ Decisions (mine, per the standing delegation):
 
 1. **Runner is `node --test`** (Node ≥18 built-in test runner) — zero
    dependencies, same constraint as the validator. Tests live in
-   `tests/*.test.mjs`, run with `node --test tests/`.
+   `tests/*.test.mjs`, run with bare `node --test` from the repo root
+   (default discovery pattern). Directory arguments (`node --test tests/`)
+   are NOT used: on Windows Node 22 they resolve the directory as a test
+   file and fail with MODULE_NOT_FOUND (verified 2026-07-25).
 2. **The suite never imports `bin/lanes-validate.mjs`** — the file executes
    its CLI at module bottom. Validator behavior is tested by spawning it
    (`child_process.execFileSync(process.execPath, …)`) against fixture
@@ -155,7 +158,7 @@ a real incident).
 
 On `push` to main and `pull_request`: matrix {ubuntu-latest,
 windows-latest} × Node {20, 22}; steps: checkout, setup-node,
-`node bin/lanes-validate.mjs selftest`, `node --test tests/`.
+`node bin/lanes-validate.mjs selftest`, bare `node --test` (repo root).
 No caching, no artifacts — the whole run is seconds.
 
 ## 7. Out of scope

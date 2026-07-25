@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Executable conformance suite (`node --test tests/`) pinning the validator's behavior and the prompt framework's lockstep invariants, plus a GitHub Actions workflow running it on every push/PR.
+**Goal:** Executable conformance suite (`node --test`) pinning the validator's behavior and the prompt framework's lockstep invariants, plus a GitHub Actions workflow running it on every push/PR.
 
 **Architecture:** Zero-dependency `node:test` suite. Behavioral tests spawn `bin/lanes-validate.mjs` against throwaway fixture git repos; structural tests assert exact strings/shapes over the prose surfaces. CI matrix ubuntu+windows × Node 20/22.
 
@@ -12,14 +12,14 @@
 
 ## Global Constraints
 
-- Zero dependencies; no `package.json` is added. The suite runs with `node --test tests/` from the repo root.
+- Zero dependencies; no `package.json` is added. The suite runs with `node --test` from the repo root.
 - **Never import `bin/lanes-validate.mjs`** (it executes its CLI at module bottom) — spawn it with `process.execPath`, or read its source as text.
 - Tests must pass on Windows and Linux: no shell-isms in spawns (use `execFileSync(process.execPath, [...])`), always set `cwd` explicitly, normalize `\` when comparing paths.
 - Fixture repos are created under `fs.mkdtempSync(path.join(os.tmpdir(), "lanes-test-"))` and removed in `after()` hooks (`fs.rmSync(dir, { recursive: true, force: true })` in try/catch — Windows file locks must not fail the suite).
 - Fixture git repos need `git init -q` + local `user.email`/`user.name` config before committing; never touch global git config.
 - The suite never modifies the real repo checkout — structural tests are read-only; behavioral tests operate only inside fixture dirs.
 - Existing files (`bin/`, `hooks/`, agents, commands, templates) are NOT modified by this slice. Only `tests/**` and `.github/workflows/ci.yml` are created.
-- `node bin/lanes-validate.mjs selftest` and `node --test tests/` must both be green at every task's commit.
+- `node bin/lanes-validate.mjs selftest` and `node --test` must both be green at every task's commit.
 
 ---
 
@@ -161,7 +161,7 @@ Implementation notes (binding):
 
 - [ ] **Step 3: Run the suite**
 
-Run: `node --test tests/` (repo root)
+Run: `node --test` (repo root)
 Expected: all tests pass (15 tests), exit 0. Also run `node bin/lanes-validate.mjs selftest` — still green.
 
 - [ ] **Step 4: Commit**
@@ -233,12 +233,12 @@ Assert `count(read("agents/lanes-implementer.md"), ENUM) === 1`, same `=== 1` fo
 
 - [ ] **Step 2: Run the suite**
 
-Run: `node --test tests/`
+Run: `node --test`
 Expected: all Task 1 + Task 2 tests pass, exit 0.
 
 - [ ] **Step 3: Mutation spot-checks (testing the tests — spec §8)**
 
-For each category below: apply the temporary mutation with a scripted edit, run `node --test tests/`, assert it FAILS, then `git checkout -- <file>` and confirm the suite is green again. Record each in the report.
+For each category below: apply the temporary mutation with a scripted edit, run `node --test`, assert it FAILS, then `git checkout -- <file>` and confirm the suite is green again. Record each in the report.
 
 1. `agents/lanes-reviewer.md`: append a line containing the five-status ENUM → §5.6 test fails.
 2. `templates/config.example.json`: rename `"tiers"` to `"tierz"` → §5.5 fails.
@@ -286,12 +286,12 @@ jobs:
       - name: Validator selftest
         run: node bin/lanes-validate.mjs selftest
       - name: Conformance suite
-        run: node --test tests/
+        run: node --test
 ```
 
 - [ ] **Step 2: Local verification**
 
-Run: `node bin/lanes-validate.mjs selftest && node --test tests/`
+Run: `node bin/lanes-validate.mjs selftest && node --test`
 Expected: both green (CI runs the same two commands).
 
 - [ ] **Step 3: Commit**
