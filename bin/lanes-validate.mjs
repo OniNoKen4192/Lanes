@@ -75,7 +75,11 @@ const SCHEMA_V1 = {
     tiers: "string[]",
     ratelimit_signal: "string[]",
   },
-  routing: { security_routed: "string[]", do_not_touch: "string[]" },
+  routing: {
+    security_routed: "string[]",
+    do_not_touch: "string[]",
+    attention: "topic_map?",
+  },
   review_suite: {
     suite_command: "string",
     id_pattern: "string",
@@ -121,6 +125,10 @@ function validateConfig(cfg) {
         if (!type.endsWith("?")) errors.push(`required field '${block}.${key}' is missing`);
       } else if (type === "posint?" && !(Number.isInteger(v) && v >= 1)) {
         errors.push(`'${block}.${key}' must be an integer >= 1`);
+      } else if (type === "topic_map?"
+          && (typeof v !== "object" || v === null || Array.isArray(v)
+              || !Object.values(v).every(isStringArray))) {
+        errors.push(`'${block}.${key}' must be an object mapping category names to arrays of glob strings`);
       } else if (type === "string" && typeof v !== "string") {
         errors.push(`'${block}.${key}' must be a string`);
       } else if (type === "string[]" && !isStringArray(v)) {
@@ -136,8 +144,8 @@ function validateConfig(cfg) {
   if (cfg.backend.approval_mode !== "pilot" && cfg.backend.approval_mode !== "automated") {
     errors.push(`'backend.approval_mode' must be "pilot" or "automated", got ${JSON.stringify(cfg.backend.approval_mode)}`);
   }
-  if (cfg.automation && !["manual", "verdicts", "conveyor"].includes(cfg.automation.level)) {
-    errors.push(`'automation.level' must be "manual", "verdicts", or "conveyor", got ${JSON.stringify(cfg.automation.level)}`);
+  if (cfg.automation && !["manual", "verdicts", "conveyor", "highways"].includes(cfg.automation.level)) {
+    errors.push(`'automation.level' must be "manual", "verdicts", "conveyor", or "highways", got ${JSON.stringify(cfg.automation.level)}`);
   }
   if (cfg.backend.tiers.length === 0) errors.push("'backend.tiers' must be a non-empty array");
   for (const key of ["test", "acceptance_runner"]) {
@@ -165,12 +173,14 @@ function loadConfig(rootDir = ".") {
   if (errors.length) {
     throw new Error(`.lanes/config.json failed schema v1 validation: ${errors.join("; ")}`);
   }
-  // Normalize (design spec 2026-07-25-roundabout-automation §2): downstream
-  // consumers never branch on absence — automation is always present.
+  // Normalize (design specs 2026-07-25-roundabout-automation §2,
+  // 2026-07-25-highways-streams §2.2): downstream consumers never branch
+  // on absence — automation and routing.attention are always present.
   cfg.automation = {
     level: cfg.automation?.level ?? "manual",
     max_fix_rounds: cfg.automation?.max_fix_rounds ?? 2,
   };
+  cfg.routing.attention = cfg.routing.attention ?? {};
   return cfg;
 }
 
@@ -304,6 +314,12 @@ const SCHEMA_VECTORS = [
   ["automation unknown key", (c) => { c.automation = { level: "manual", turbo: true }; }, "unknown key 'automation.turbo'"],
   ["automation zero cap", (c) => { c.automation = { level: "conveyor", max_fix_rounds: 0 }; }, "integer >= 1"],
   ["automation string cap", (c) => { c.automation = { level: "conveyor", max_fix_rounds: "2" }; }, "integer >= 1"],
+  ["automation highways", (c) => { c.automation = { level: "highways" }; }, null],
+  ["attention empty map", (c) => { c.routing.attention = {}; }, null],
+  ["attention valid map", (c) => { c.routing.attention = { billing: ["src/billing/**"], schema: ["prisma/migrations/**"] }; }, null],
+  ["attention not an object", (c) => { c.routing.attention = ["src/billing/**"]; }, "routing.attention"],
+  ["attention category not an array", (c) => { c.routing.attention = { billing: "src/billing/**" }; }, "routing.attention"],
+  ["attention non-string glob", (c) => { c.routing.attention = { billing: [1] }; }, "routing.attention"],
 ];
 
 function runSchemaChecks() {

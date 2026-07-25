@@ -412,3 +412,43 @@ describe("doctor: absent automation block reports manual", () => {
     assert.equal(r.json.automation.max_fix_rounds, 2);
   });
 });
+
+describe("gate: highways level accepted", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.automation = { level: "highways" };
+  } });
+  after(() => fx.cleanup());
+
+  test("gate: highways level accepted", () => {
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 0);
+    assert.equal(r.json.ok, true);
+  });
+});
+
+describe("gate: valid attention config accepted", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.routing.attention = { lib: ["src/lib/**"], billing: ["src/billing/**"] };
+  } });
+  after(() => fx.cleanup());
+
+  test("gate: valid attention config accepted", () => {
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 0);
+    assert.equal(r.json.ok, true);
+  });
+});
+
+describe("gate: bad attention shape refused", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.routing.attention = { lib: "src/lib/**" };
+  } });
+  after(() => fx.cleanup());
+
+  test("gate: bad attention shape refused", () => {
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.notEqual(r.status, 0);
+    assert.ok((r.stdout + r.stderr).includes("routing.attention"),
+      `expected a routing.attention error, got: ${r.stdout} ${r.stderr}`);
+  });
+});

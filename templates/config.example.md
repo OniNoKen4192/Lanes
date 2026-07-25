@@ -88,6 +88,14 @@ missing prefix as an all-zero-matches warning.
   primitives, lockfiles, secrets). Pipeline-owned paths named by
   `pipeline.*` are already protected structurally and do NOT need to be
   repeated here.
+- `attention` (object, optional): named attention categories — category
+  name → list of path globs. In an unattended walk (`/lanes-run` at
+  `conveyor` or above, or a `/lanes-highway` run), a task whose Touch
+  list matches any of these globs parks on arrival, with the category
+  named in the park reason — "this topic waits for me." Unlike
+  `security_routed` it does not force KEEP routing and is not a gate
+  refusal; at `manual` and `verdicts` it has no effect. Absent means no
+  attention categories (`{}`).
 
 ## `review_suite`  (optional — omit the whole block if no e2e/UX suite)
 
@@ -127,12 +135,17 @@ ledger history is evidence you consult, not a mechanism.
     FIX → re-dispatch up to the cap). REJECT always stops for you.
   - `"conveyor"` — `/lanes-run <plan>` drives the whole task graph
     end-to-end; see that command for park semantics.
+  - `"highways"` — `/lanes-highway <feature>` runs the full two-level
+    stream orchestration: one human gate (the stream map), unattended
+    per-stream planning, concurrent stream execution, and an
+    integration branch + review document — the working branch is never
+    touched. Includes everything `"conveyor"` authorizes.
 - `max_fix_rounds` (integer ≥ 1, optional, default `2`): how many FIX
   rounds a task gets before it parks as needs-human.
 
-The safety floor holds at every level: security-routed work never runs
-unattended, REJECT is always a human decision, and nothing is ever
-pushed to a remote.
+The safety floor holds at every level: security-routed and
+attention-matched work never runs unattended, REJECT is always a human
+decision, and nothing is ever pushed to a remote.
 
 ## Migrating from the legacy `.lanes/config.md`
 

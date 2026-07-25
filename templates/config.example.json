@@ -39,7 +39,12 @@
       "wisconsin-ice-exchange/pnpm-lock.yaml",
       "wisconsin-ice-exchange/.env",
       "wisconsin-ice-exchange/.env.example"
-    ]
+    ],
+    "attention": {
+      "billing": [
+        "wisconsin-ice-exchange/src/lib/billing/**"
+      ]
+    }
   },
   "review_suite": {
     "suite_command": "pnpm test:ux",

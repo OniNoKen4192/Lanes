@@ -118,7 +118,7 @@ test("§5.5 config vocabulary sync", () => {
     project: ["app_subdir", "command_prefix"],
     commands: ["test", "lint", "typecheck", "acceptance_runner"],
     backend: ["name", "dispatch_tool", "reply_tool", "approval_mode", "tiers", "ratelimit_signal"],
-    routing: ["security_routed", "do_not_touch"],
+    routing: ["security_routed", "do_not_touch", "attention"],
     review_suite: ["suite_command", "id_pattern", "id_index", "route_map"],
     pipeline: ["plans_dir", "tasks_dir", "ledger"],
     automation: ["level", "max_fix_rounds"],
