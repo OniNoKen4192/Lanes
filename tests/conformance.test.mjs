@@ -373,10 +373,7 @@ test("§5.12 amendments discipline", () => {
   const reviewer = read("agents/lanes-reviewer.md");
   assert.ok(reviewer.includes("`## Amendments`"), "reviewer should reference `## Amendments`");
   assert.ok(reviewer.includes("Original sha256"), "reviewer should reference 'Original sha256'");
-  assert.ok(
-    !reviewer.includes("old text,\n      new text"),
-    "reviewer should not include the retired edit-format phrase 'old text,\\n      new text'"
-  );
+  assert.ok(!reviewer.includes("old text,"), "reviewer should not include the retired edit-format phrase 'old text,'");
 
   // TEMPLATE.md: includes ## Amendments (created at first use and
   // Reviewer Checklist item 4 includes 'immutable'

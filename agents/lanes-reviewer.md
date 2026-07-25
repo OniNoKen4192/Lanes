@@ -262,7 +262,7 @@ Every verdict also includes, after the first line:
       - **Deviation**: <what was done differently>
       - **Reason accepted**: <why>
       - **Affected paths**: <paths involved>
-      - **Acceptance criteria**: <replacement criteria, or "unchanged">>
+      - **Acceptance criteria**: <replacement criteria, or "unchanged">
     RERUN_EVIDENCE: <each command you ran with its tail output/counts —
       acceptance, unit, typecheck, lint, and e2e if applicable (or the
       no-review_suite fallback line from Phase 4 if not). Real output
@@ -287,4 +287,6 @@ Every verdict also includes, after the first line:
   edit to the sections above the `## Amendments` marker. The validator
   hashes only the content above the marker, so appended amendments
   never trip the audit's `spec_modified` tamper check — a body edit
-  still does.
+  still does. The spec file the controller amends is always the
+  MAIN-tree working copy; a worktree's copy is a synced snapshot,
+  refreshed on the next dispatch.
