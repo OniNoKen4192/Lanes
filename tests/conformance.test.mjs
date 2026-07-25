@@ -436,6 +436,8 @@ test("highways: /lanes-highway command structure", () => {
   assert.ok(!cmd.includes("git push"), "a highway run must never push to a remote");
   assert.ok(cmd.includes("never committed to, merged into, or checked"),
     "lanes-highway.md should state the never-touch-working-branch rule");
+  assert.ok(cmd.includes("A KEEP task whose Touch matches any `routing.attention` category"),
+    "lanes-highway.md should park attention-matched KEEP tasks");
 });
 
 test("highways: stream planner agent plans only", () => {
@@ -453,6 +455,8 @@ test("highways: lanes-run accepts both levels and parks attention", () => {
   assert.ok(cmd.includes('"conveyor"') && cmd.includes('"highways"'),
     "lanes-run.md precondition should name both accepted levels");
   assert.ok(cmd.includes("attention --spec"), "lanes-run.md should call the attention subcommand");
+  assert.ok(cmd.includes("Security-routed or attention-matched KEEP task"),
+    "lanes-run.md should park attention-matched KEEP tasks");
 });
 
 test("highways: SKILL.md references /lanes-highway", () => {

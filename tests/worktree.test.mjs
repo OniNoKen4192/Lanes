@@ -329,3 +329,34 @@ describe("worktree remove --stream: clean removal", () => {
     assert.ok(!fs.existsSync(path.join(fx.dir, ".lanes", "worktrees", "stream-s1")), "expected stream worktree gone");
   });
 });
+
+describe("worktree create --base: dangling flag refused", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree create --base: dangling flag refused", () => {
+    fs.writeFileSync(path.join(fx.dir, "docs", "tasks", "T2.md"), T2_SPEC);
+    const r = validate(fx.dir, "worktree", "create", "--spec", "docs/tasks/T2.md", "--base");
+    assert.equal(r.status, 2);
+    assert.ok(r.json.reason.includes("--base"), `got: ${r.json.reason}`);
+    assert.ok(!fs.existsSync(path.join(fx.dir, ".lanes", "worktrees", "T2")), "no worktree should be created");
+  });
+});
+
+describe("worktree create --stream --base: cut from named ref", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree create --stream --base: cut from named ref", () => {
+    gitC(fx.dir, "branch", "streambase");
+    fs.appendFileSync(path.join(fx.dir, "src", "lib", "thing.js"), "// advance main\n");
+    fx.commit("advance main");
+    const baseSha = gitC(fx.dir, "rev-parse", "streambase");
+    assert.notEqual(baseSha, gitC(fx.dir, "rev-parse", "HEAD"));
+
+    const r = validate(fx.dir, "worktree", "create", "--stream", "s2", "--base", "streambase");
+    assert.equal(r.status, 0, `stream --base failed: ${r.stdout} ${r.stderr}`);
+    assert.equal(r.json.base_sha, baseSha);
+    assert.equal(gitC(fx.dir, "rev-parse", "highway/s2"), baseSha);
+  });
+});

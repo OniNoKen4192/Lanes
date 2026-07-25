@@ -971,14 +971,24 @@ function argOf(flag) {
   return i >= 0 ? rest[i + 1] : undefined;
 }
 
+function baseOf() {
+  if (!rest.includes("--base")) return undefined;
+  const v = argOf("--base");
+  if (v === undefined) {
+    console.log(JSON.stringify({ ok: false, check: "worktree", reason: "--base requires a ref value" }));
+    process.exit(2);
+  }
+  return v;
+}
+
 try {
   if (cmd === "selftest") runSelftest();
   else if (cmd === "gate") runGate(argOf("--spec"));
   else if (cmd === "audit") runAudit(argOf("--task"));
   else if (cmd === "attention") runAttention(argOf("--spec"));
   else if (cmd === "doctor") runDoctor();
-  else if (cmd === "worktree" && rest[0] === "create" && rest.includes("--stream")) runWorktreeCreateStream(argOf("--stream"), argOf("--base"));
-  else if (cmd === "worktree" && rest[0] === "create") runWorktreeCreate(argOf("--spec"), argOf("--base"));
+  else if (cmd === "worktree" && rest[0] === "create" && rest.includes("--stream")) runWorktreeCreateStream(argOf("--stream"), baseOf());
+  else if (cmd === "worktree" && rest[0] === "create") runWorktreeCreate(argOf("--spec"), baseOf());
   else if (cmd === "worktree" && rest[0] === "remove" && rest.includes("--stream")) runWorktreeRemove(argOf("--stream"), rest.includes("--force"), "stream");
   else if (cmd === "worktree" && rest[0] === "remove") runWorktreeRemove(argOf("--task"), rest.includes("--force"), "task");
   else {

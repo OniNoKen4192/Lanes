@@ -52,9 +52,10 @@ immutable-spec amendments all apply to every dispatch exactly as always.
    - **Ordinary KEEP task** → execute it inline yourself via the normal
      superpowers loop (implement, test, commit), exactly as in
      subagent-driven execution.
-   - **Security-routed KEEP task** (its Touch matches
-     `routing.security_routed`) → park it immediately. Security-routed
-     work never runs unattended.
+   - **Security-routed or attention-matched KEEP task** (its Touch
+     matches `routing.security_routed` or any `routing.attention`
+     category) → park it immediately, naming the list or category.
+     Security-routed and attention-matched work never runs unattended.
 3. **Park, never halt.** A parked task — and every task downstream of
    it — leaves the conveyor; the walk continues with every task that
    does not depend on it. Park on: reviewer REJECT, FIX rounds

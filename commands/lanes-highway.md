@@ -63,10 +63,11 @@ immutable-spec amendments apply to every dispatch exactly as always.
    parks if any dependency parks or lands partial. Within a stream,
    walk its Task/Lane Map serially in dependency order exactly as
    `/lanes-run` does, with three substitutions:
-   - **Attention check first.** Before dispatching any task, run
-     `… attention --spec <spec-path>`; any matching category parks the
-     task on arrival, category in the reason — attention work never
-     runs unattended, exactly like security-routed arrival.
+   - **Attention check first.** Before dispatching any DELEGATE task, run
+     `… attention --spec <spec-path>`; any matching category parks the task on
+     arrival, category in the reason. A KEEP task whose Touch matches any `routing.attention` category
+     (or `routing.security_routed`) parks the same way — attention-matched and
+     security-routed work never runs unattended.
    - **Task worktrees cut from the stream branch:**
      `… worktree create --spec <spec-path> --base highway/<id>`; an
      APPROVE merges `lanes/<task-id>` into the STREAM branch inside the
