@@ -186,6 +186,15 @@ function specBody(text) {
   return text.split(/^## Amendments[ \t]*$/m)[0].replace(/\s+$/, "");
 }
 
+// The appendix (marker line down) is hashed separately: the audit
+// reports spec_appendix_modified as an informational field the reviewer
+// rules on — a legitimate controller-applied amendment between rounds
+// changes it too, so it is never a violation by itself.
+function specAppendix(text) {
+  const m = text.match(/^## Amendments[ \t]*$/m);
+  return m ? text.slice(m.index) : "";
+}
+
 // Mirrors the examples table in docs/PATH-MATCHING.md — keep in sync.
 const MATCH_VECTORS = [
   // [pattern, path, expected]
@@ -447,7 +456,7 @@ function runGate(specPathArg) {
     gateFail("spec", `spec path is outside the repo: ${specPathArg}`);
   }
   const specText = fs.readFileSync(specPath, "utf8");
-  const spec = parseSpec(specText);
+  const spec = parseSpec(specBody(specText));
   if (!spec.taskId) gateFail("spec", "spec has no '**Task ID**:' entry in Meta");
   if (!spec.touch.length) gateFail("spec", "spec's Touch table is empty or unparseable");
 
@@ -500,6 +509,7 @@ function runGate(specPathArg) {
     task: spec.taskId,
     spec_path: specPath,
     spec_sha256: sha256(specBody(specText)),
+    spec_appendix_sha256: sha256(specAppendix(specText)),
     touch: spec.touch.map(normalizePath),
     base_sha: git("rev-parse", "HEAD"),
     dispatched_at: new Date().toISOString(),
@@ -555,6 +565,7 @@ function runAudit(taskIdArg) {
     task: state.task,
     base_sha: state.base_sha,
     spec_modified: sha256(specBody(specText)) !== state.spec_sha256,
+    spec_appendix_modified: sha256(specAppendix(specText)) !== (state.spec_appendix_sha256 ?? sha256("")),
     commits_past_base: git("rev-list", `${state.base_sha}..HEAD`).split("\n").filter(Boolean),
     in_scope: [], out_of_scope: [], forbidden: [], allowlisted: [],
   };
@@ -754,7 +765,7 @@ function runWorktreeCreate(specPathArg) {
   try { loadConfig(); } catch (err) { wtFail(String(err.message || err)); }
   const specPath = normalizePath(specPathArg);
   if (!fs.existsSync(specPath)) wtFail(`spec file not found: ${specPath}`);
-  const spec = parseSpec(fs.readFileSync(specPath, "utf8"));
+  const spec = parseSpec(specBody(fs.readFileSync(specPath, "utf8")));
   if (!spec.taskId) wtFail("spec has no '**Task ID**:' entry in Meta");
   const taskFile = spec.taskId.replace(/[^A-Za-z0-9._-]/g, "_");
   const branch = `lanes/${taskFile}`;

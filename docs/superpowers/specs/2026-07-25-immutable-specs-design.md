@@ -51,11 +51,16 @@ function specBody(text) {
 - `audit` computes `spec_modified` as
   `sha256(specBody(specText)) !== state.spec_sha256`.
 
-Nothing else changes: `parseSpec` already reads Meta/Touch from the body
-(an amendment cannot inject Touch rows the parser would see differently —
-the Touch table lives in `### Touch`, and even a crafted table inside the
-appendix would only matter at a *future* gate, where the operator sees
-the file; dispatch-time state is what the audit enforces).
+The gate (and `worktree create`) parse the spec from `specBody(...)` as
+well — the parsed contract and the hashed contract are the same region,
+so Meta/Touch sections below the marker hit the existing fail-closed
+refusals instead of being silently enforced-from. The gate additionally
+records `spec_appendix_sha256` (hash from the marker down, `""` when
+absent) and the audit reports `spec_appendix_modified` as an
+informational field: a controller-applied amendment between rounds
+legitimately changes it, so the reviewer rules on it rather than the
+verdict tripping automatically — but a delegate-authored appendix now
+has a deterministic tell.
 
 ## 3. Amendment entry format
 

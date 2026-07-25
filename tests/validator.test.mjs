@@ -116,6 +116,20 @@ describe("gate: dirty tree blocks", () => {
   });
 });
 
+describe("gate: refuses contract sections hidden below the amendments marker", () => {
+  const spec = "# TASK: x\n## Meta\n- **Parent plan**: docs/plans/p.md\n"
+    + "## Amendments\n"
+    + FIXTURE_SPEC;
+  const fx = makeFixtureRepo({ spec });
+  after(() => fx.cleanup());
+
+  test("gate: refuses contract sections hidden below the amendments marker", () => {
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.check, "spec");
+  });
+});
+
 describe("audit: out-of-scope edit flagged", () => {
   const fx = makeFixtureRepo();
   after(() => fx.cleanup());
@@ -168,6 +182,24 @@ describe("audit: spec edited after dispatch flagged", () => {
   });
 });
 
+describe("audit: mid-body amendments marker trips spec_modified", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("audit: mid-body amendments marker trips spec_modified", () => {
+    const g = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(g.status, 0);
+
+    const specPath = path.join(fx.dir, "docs", "tasks", "T1.md");
+    const tampered = fs.readFileSync(specPath, "utf8").replace("### Touch", "## Amendments\n\n### Touch");
+    fs.writeFileSync(specPath, tampered);
+
+    const r = validate(fx.dir, "audit", "--task", "T1");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.spec_modified, true);
+  });
+});
+
 describe("audit: appended amendments do not trip spec_modified", () => {
   const fx = makeFixtureRepo();
   after(() => fx.cleanup());
@@ -186,6 +218,7 @@ describe("audit: appended amendments do not trip spec_modified", () => {
     assert.equal(r.status, 0);
     assert.equal(r.json.verdict, "clean");
     assert.equal(r.json.spec_modified, false);
+    assert.equal(r.json.spec_appendix_modified, true);
   });
 });
 
@@ -206,6 +239,35 @@ describe("audit: body edit plus amendments still trips spec_modified", () => {
     assert.equal(r.status, 2);
     assert.equal(r.json.verdict, "violations");
     assert.equal(r.json.spec_modified, true);
+  });
+});
+
+describe("audit: pre-amended spec round-trips clean", () => {
+  const spec = FIXTURE_SPEC
+    + "\n## Amendments\n\n### A1 — 2026-07-25 — accepted deviation\n- **Deviation**: prior\n";
+  const fx = makeFixtureRepo({ spec });
+  after(() => fx.cleanup());
+
+  test("audit: pre-amended spec round-trips clean", () => {
+    const g = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(g.status, 0);
+
+    const r1 = validate(fx.dir, "audit", "--task", "T1");
+    assert.equal(r1.status, 0);
+    assert.equal(r1.json.verdict, "clean");
+    assert.equal(r1.json.spec_modified, false);
+    assert.equal(r1.json.spec_appendix_modified, false);
+
+    fs.appendFileSync(
+      path.join(fx.dir, "docs", "tasks", "T1.md"),
+      "\n### A2 — 2026-07-25 — accepted deviation\n- **Deviation**: another\n",
+    );
+
+    const r2 = validate(fx.dir, "audit", "--task", "T1");
+    assert.equal(r2.status, 0);
+    assert.equal(r2.json.verdict, "clean");
+    assert.equal(r2.json.spec_modified, false);
+    assert.equal(r2.json.spec_appendix_modified, true);
   });
 });
 

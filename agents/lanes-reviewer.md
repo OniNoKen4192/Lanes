@@ -118,6 +118,14 @@ re-derive glob matches by judgment. For the diff content itself, use
      `.lanes/config.json`) — outputs, never task inputs.
 4. A passing test suite NEVER overrides a scope violation. Do not
    weigh them against each other; scope is a gate, not a factor.
+5. **`spec_appendix_modified: true`** in the audit report means the
+   spec's `## Amendments` appendix changed since dispatch. That is
+   legitimate ONLY when it is exactly the amendment(s) the controller
+   itself appended between rounds. In worktree mode, diff the
+   worktree's spec against the MAIN-tree copy — only the controller
+   writes main; any divergence, especially under `## Amendments`, is
+   delegate tampering → automatic REJECT. A delegate has no business
+   writing to the spec file at all.
 
 # Phase 3 — Contract audit
 
@@ -289,4 +297,4 @@ Every verdict also includes, after the first line:
   never trip the audit's `spec_modified` tamper check — a body edit
   still does. The spec file the controller amends is always the
   MAIN-tree working copy; a worktree's copy is a synced snapshot,
-  refreshed on the next dispatch.
+  refreshed only when a worktree is (re)created.
