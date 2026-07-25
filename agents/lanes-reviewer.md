@@ -39,6 +39,13 @@ You will be invoked with:
    dispatch gate). Only if that state file is also missing may you fall
    back to HEAD vs working tree — and say so in your verdict, because
    any commit the delegate made would be invisible to that fallback.
+4. In worktree mode, the worktree path the implementer used — the SAME
+   worktree, handed to you explicitly by the dispatcher (never a fresh
+   one: a second worktree would audit different state than the one the
+   implementer produced). Every command you run — the audit, diffs, the
+   acceptance rerun, unit/static suites, e2e — runs from inside it. The
+   baseline record is found automatically; it lives in the main repo's
+   `.lanes/state/`.
 
 If the spec or the report is missing, refuse (VERDICT: REJECT with one
 sentence saying which input is missing — that's a dispatcher error, not

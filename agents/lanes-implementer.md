@@ -38,11 +38,23 @@ default `docs/superpowers/tasks/`).
 Read it first. If you were invoked with prose instead of a spec file path,
 report BLOCKED immediately — you do not accept freehand tasks.
 
+**Worktree mode.** The dispatcher may also hand you a worktree path — a
+per-task isolation workspace it created with `lanes-validate.mjs worktree
+create` (checked out at `.lanes/worktrees/<task-id>`, branch
+`lanes/<task-id>`, clean at the recorded base). When it does, that
+worktree is the working root for EVERYTHING: the Phase 1 gate, the
+acceptance red-check, the dispatch, and every Phase 3 verification
+command run from inside it, and the spec path is worktree-relative. The
+baseline record still lands in the main repo's `.lanes/state/` — the
+validator handles that placement itself; never write there. Without a
+worktree path, work at the session root exactly as described below.
+
 # Phase 1 — Validation Gate (before any backend call)
 
 Read the spec and check, in order:
 
-1. **Run the deterministic gate.** Execute (Bash):
+1. **Run the deterministic gate.** Execute (Bash; in worktree mode run it
+   from inside the worktree — `cd <worktree> && …`):
 
        node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" gate --spec <spec-file-path>
 
@@ -96,6 +108,9 @@ Call the `dispatch_tool` named in `.lanes/config.json` (v1:
 - **Prompt**: the ENTIRE spec file content, verbatim, prefixed with exactly:
 
       LANES-SPEC: <repo-relative path to the spec file>
+      LANES-WORKTREE: <worktree path — worktree mode ONLY; omit this
+        line entirely otherwise, and make the spec path worktree-relative
+        when you include it>
 
       You are implementing a single scoped task. The spec below is your
       complete contract. Follow it literally. Do not modify any file not
@@ -116,12 +131,17 @@ Call the `dispatch_tool` named in `.lanes/config.json` (v1:
   The `LANES-SPEC:` first line is the machine-readable header the
   plugin's PreToolUse hook parses to hard-gate the dispatch. Omitting it
   makes the call look like non-Lanes traffic and bypasses the gate —
-  never omit or reword it.
+  never omit or reword it. In worktree mode the `LANES-WORKTREE:` second
+  line is equally load-bearing: the hook verifies it against
+  `git worktree list` and runs the gate inside that worktree — omitting
+  it would gate (and demand a clean baseline from) the wrong tree.
 
 - **Parameters**: sandbox: workspace-write; approval-policy set from the
   project's `approval_mode` (`.lanes/config.json`): `pilot` → on-request,
   `automated` → never. Flip it here, nowhere else — the mode is a config
-  fact, not a judgment call this agent makes per-task.
+  fact, not a judgment call this agent makes per-task. In worktree mode,
+  also set the tool's working directory (its `cwd` parameter) to the
+  worktree — the delegate's sandbox is the worktree, never the main tree.
 
 If the backend asks a follow-up question via its output, answer ONLY
 from the spec's content using the `reply_tool` named in
@@ -133,7 +153,8 @@ BLOCKED with the question as the BLOCKED_REASON.
 
 # Phase 3 — Verification (never trust the backend's self-report)
 
-After the backend returns, regardless of what it claims:
+After the backend returns, regardless of what it claims (worktree mode:
+every command below runs from inside the worktree):
 
 1. Run the deterministic audit (Bash):
 

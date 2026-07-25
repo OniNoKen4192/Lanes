@@ -94,8 +94,18 @@ Once the plan is approved:
    pipeline-owned paths, and the audit reports them as `allowlisted`,
    never as scope violations. Commit specs whenever convenient for
    history.
-3. Dispatch each DELEGATE spec to `lanes-implementer`. Its report — spec
-   path plus the report content — is then dispatched to `lanes-reviewer`.
+3. For each DELEGATE spec, create its isolation worktree first:
+   `node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" worktree create --spec <spec-path>`
+   (per-task worktree at `.lanes/worktrees/<task-id>`, branch
+   `lanes/<task-id>`, clean at the recorded base). Dispatch
+   `lanes-implementer` with the spec path AND the worktree path; then
+   dispatch `lanes-reviewer` with the spec path, the implementer's
+   report, and the SAME worktree path — implementer and reviewer must
+   audit the same tree. On APPROVE: commit the work inside the worktree,
+   merge `lanes/<task-id>` into your working branch, then
+   `… worktree remove --task <task-id>`. On REJECT: the worktree stays
+   inspectable; dispose of it with `worktree remove` (add `--force` to
+   discard its uncommitted work) when done.
 4. KEEP tasks proceed via normal superpowers execution (no spec, no
    `lanes-implementer`, no `lanes-reviewer` — the usual superpowers
    inner loop and review).

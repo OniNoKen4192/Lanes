@@ -60,7 +60,10 @@ migration path if your project still has a legacy Markdown config.
    task's lane against the routing rules and emits one spec file per
    DELEGATE-routed task into your project's tasks directory. KEEP tasks
    get no spec file at all.
-3. **Dispatch DELEGATE specs to `lanes-implementer`.** It validates the
+3. **Dispatch DELEGATE specs to `lanes-implementer`.** Each task runs in
+   its own controller-created git worktree (`.lanes/worktrees/<task-id>`),
+   so delegated work never touches your tree or another task's — and a
+   dirty main tree no longer blocks dispatch. The implementer validates the
    spec, hands it to the configured backend verbatim, verifies the result
    itself (scope, acceptance, regression, interfaces — never the backend's
    word alone), and reports IMPLEMENTED / IMPLEMENTED_WITH_DEVIATIONS /
