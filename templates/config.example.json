@@ -15,22 +15,30 @@
     "dispatch_tool": "mcp__codex__codex",
     "reply_tool": "mcp__codex__codex-reply",
     "approval_mode": "pilot",
-    "tiers": ["sol", "terra", "luna"],
-    "ratelimit_signal": ["usage-cap", "429", "rate limit"]
+    "tiers": [
+      "sol",
+      "terra",
+      "luna"
+    ],
+    "ratelimit_signal": [
+      "usage-cap",
+      "429",
+      "rate limit"
+    ]
   },
   "routing": {
     "security_routed": [
-      "src/auth.ts",
-      "src/lib/authz.ts",
-      "src/lib/availability.ts",
-      "prisma/schema.prisma",
-      "prisma/migrations/**"
+      "wisconsin-ice-exchange/src/auth.ts",
+      "wisconsin-ice-exchange/src/lib/authz.ts",
+      "wisconsin-ice-exchange/src/lib/availability.ts",
+      "wisconsin-ice-exchange/prisma/schema.prisma",
+      "wisconsin-ice-exchange/prisma/migrations/**"
     ],
     "do_not_touch": [
-      "src/components/ui/**",
-      "pnpm-lock.yaml",
-      ".env",
-      ".env.example"
+      "wisconsin-ice-exchange/src/components/ui/**",
+      "wisconsin-ice-exchange/pnpm-lock.yaml",
+      "wisconsin-ice-exchange/.env",
+      "wisconsin-ice-exchange/.env.example"
     ]
   },
   "review_suite": {
@@ -38,10 +46,32 @@
     "id_pattern": "<id>-",
     "id_index": "docs/workflows.md",
     "route_map": {
-      "src/app/admin/**": ["a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8"],
-      "src/app/org/**": ["o1", "o2", "o3", "o4"],
-      "src/app/teams/**": ["s5", "s6", "s7", "s10", "v2"],
-      "src/app/account/**": ["s11"]
+      "wisconsin-ice-exchange/src/app/admin/**": [
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6",
+        "a7",
+        "a8"
+      ],
+      "wisconsin-ice-exchange/src/app/org/**": [
+        "o1",
+        "o2",
+        "o3",
+        "o4"
+      ],
+      "wisconsin-ice-exchange/src/app/teams/**": [
+        "s5",
+        "s6",
+        "s7",
+        "s10",
+        "v2"
+      ],
+      "wisconsin-ice-exchange/src/app/account/**": [
+        "s11"
+      ]
     }
   },
   "pipeline": {

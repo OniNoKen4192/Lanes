@@ -69,7 +69,12 @@ Resolved from your package manifest (package.json scripts) at init;
 
 Patterns in both lists follow `docs/PATH-MATCHING.md` (normative): `*`
 within a segment, `**` across segments, a literal path matches itself
-and everything beneath it, matching is case-insensitive.
+and everything beneath it, matching is case-insensitive. Patterns are
+**repo-relative from the git toplevel, not from `app_subdir`** — when
+the app lives in a subdirectory, every pattern must carry the prefix
+(WIX: `wisconsin-ice-exchange/src/auth.ts`, never bare `src/auth.ts`,
+which would match nothing). `/lanes-doctor`'s glob preview catches a
+missing prefix as an all-zero-matches warning.
 
 - `security_routed` (array of strings): any task whose Touch list
   matches one of these routes KEEP (the in-session lane), no
