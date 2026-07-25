@@ -2,6 +2,7 @@
 // lanes-validate — deterministic scope gate for the Lanes pipeline.
 // Subcommands: gate --spec <path> | audit --task <id> | selftest
 // Behavior spec: docs/superpowers/specs/2026-07-24-scope-gate-design.md
+// Config schema: docs/superpowers/specs/2026-07-24-config-schema-design.md §2.
 // Matching semantics: docs/PATH-MATCHING.md (normative; keep in sync
 // with MATCH_VECTORS below — the conformance suite will assert it).
 
@@ -51,52 +52,117 @@ function matchAny(patterns, p) {
   return null;
 }
 
-// ---------------------------------------------------------------- parsing
+// ---------------------------------------------------------------- config
 
-// Minimal, targeted parse of .lanes/config.md (full schema migration is
-// issue #5). Recognizes top-level `key: value` scalars and `key:` +
-// indented `- item` lists. Markdown headings, HTML comments, and
-// trailing `# …` comments are stripped.
-function parseConfig(text) {
-  const stripped = text.replace(/<!--[\s\S]*?-->/g, "");
-  const scalars = {};
-  const lists = {};
-  let currentList = null;
-  for (const raw of stripped.split(/\r?\n/)) {
-    const line = raw.replace(/\s#.*$/, "").trimEnd();
-    if (!line.trim()) continue;                 // a blank line keeps the open list open
-    if (line.trimStart().startsWith("#")) { currentList = null; continue; } // a heading closes it
-    const item = line.match(/^\s+-\s+(.+)$/);
-    if (item && currentList) { lists[currentList].push(item[1].trim()); continue; }
-    const kv = line.match(/^([a-z_]+):\s*(.*)$/);
-    if (kv) {
-      const [, key, value] = kv;
-      if (value === "") { lists[key] = []; currentList = key; }
-      else { scalars[key] = value.trim(); currentList = null; }
-    } else {
-      currentList = null;
+// Strict, fail-closed validation of .lanes/config.json (schema v1).
+// Behavior spec: docs/superpowers/specs/2026-07-24-config-schema-design.md §2.
+// Unknown keys, wrong types, or a wrong schema_version are refusals —
+// a misspelled security list must die loudly, never be silently ignored.
+
+const SCHEMA_V1 = {
+  project: { app_subdir: "string", command_prefix: "string" },
+  commands: {
+    test: "string",
+    lint: "string",
+    typecheck: "string",
+    acceptance_runner: "string",
+  },
+  backend: {
+    name: "string",
+    dispatch_tool: "string",
+    reply_tool: "string",
+    approval_mode: "string",
+    tiers: "string[]",
+    ratelimit_signal: "string[]",
+  },
+  routing: { security_routed: "string[]", do_not_touch: "string[]" },
+  review_suite: {
+    suite_command: "string",
+    id_pattern: "string",
+    id_index: "string",
+    route_map: "route_map",
+  },
+  pipeline: { plans_dir: "string", tasks_dir: "string", ledger: "string" },
+};
+const OPTIONAL_BLOCKS = new Set(["review_suite"]);
+
+function isStringArray(v) {
+  return Array.isArray(v) && v.every((x) => typeof x === "string");
+}
+
+function validateConfig(cfg) {
+  if (typeof cfg !== "object" || cfg === null || Array.isArray(cfg)) {
+    return ["config root is not a JSON object"];
+  }
+  if (cfg.schema_version !== 1) {
+    return [`schema_version must be the number 1, got ${JSON.stringify(cfg.schema_version)}`];
+  }
+  const errors = [];
+  for (const key of Object.keys(cfg)) {
+    if (key !== "schema_version" && !(key in SCHEMA_V1)) errors.push(`unknown key '${key}'`);
+  }
+  for (const [block, fields] of Object.entries(SCHEMA_V1)) {
+    const val = cfg[block];
+    if (val === undefined) {
+      if (!OPTIONAL_BLOCKS.has(block)) errors.push(`required block '${block}' is missing`);
+      continue;
+    }
+    if (typeof val !== "object" || val === null || Array.isArray(val)) {
+      errors.push(`'${block}' must be a JSON object`);
+      continue;
+    }
+    for (const key of Object.keys(val)) {
+      if (!(key in fields)) errors.push(`unknown key '${block}.${key}'`);
+    }
+    for (const [key, type] of Object.entries(fields)) {
+      const v = val[key];
+      if (v === undefined) {
+        errors.push(`required field '${block}.${key}' is missing`);
+      } else if (type === "string" && typeof v !== "string") {
+        errors.push(`'${block}.${key}' must be a string`);
+      } else if (type === "string[]" && !isStringArray(v)) {
+        errors.push(`'${block}.${key}' must be an array of strings`);
+      } else if (type === "route_map"
+          && (typeof v !== "object" || v === null || Array.isArray(v)
+              || !Object.values(v).every(isStringArray))) {
+        errors.push(`'${block}.${key}' must be an object mapping glob strings to arrays of ID strings`);
+      }
     }
   }
-  return { scalars, lists };
+  if (errors.length) return errors; // field rules below assume the structure above held
+  if (cfg.backend.approval_mode !== "pilot" && cfg.backend.approval_mode !== "automated") {
+    errors.push(`'backend.approval_mode' must be "pilot" or "automated", got ${JSON.stringify(cfg.backend.approval_mode)}`);
+  }
+  if (cfg.backend.tiers.length === 0) errors.push("'backend.tiers' must be a non-empty array");
+  for (const key of ["test", "acceptance_runner"]) {
+    if (cfg.commands[key].trim() === "") {
+      errors.push(`'commands.${key}' must be non-empty — "" is only allowed for lint and typecheck ("no such step")`);
+    }
+  }
+  return errors;
 }
 
 function loadConfig() {
-  const p = ".lanes/config.md";
-  if (!fs.existsSync(p)) throw new Error(".lanes/config.md not found — run /lanes-init first");
-  const { scalars, lists } = parseConfig(fs.readFileSync(p, "utf8"));
-  for (const key of ["security_routed", "do_not_touch"]) {
-    if (!Array.isArray(lists[key])) {
-      throw new Error(`.lanes/config.md: required list '${key}' is missing or unparseable`);
-    }
+  const p = ".lanes/config.json";
+  if (!fs.existsSync(p)) {
+    throw new Error(fs.existsSync(".lanes/config.md")
+      ? ".lanes/config.json not found, but a legacy .lanes/config.md exists — run /lanes-doctor to migrate it"
+      : ".lanes/config.json not found — run /lanes-init first");
   }
-  return {
-    security_routed: lists.security_routed,
-    do_not_touch: lists.do_not_touch,
-    tasks_dir: scalars.tasks_dir || "docs/superpowers/tasks",
-    plans_dir: scalars.plans_dir || "docs/superpowers/plans",
-    ledger: scalars.ledger || ".superpowers/sdd/progress.md",
-  };
+  let cfg;
+  try {
+    cfg = JSON.parse(fs.readFileSync(p, "utf8"));
+  } catch (err) {
+    throw new Error(`.lanes/config.json is not valid JSON: ${String(err.message || err)}`);
+  }
+  const errors = validateConfig(cfg);
+  if (errors.length) {
+    throw new Error(`.lanes/config.json failed schema v1 validation: ${errors.join("; ")}`);
+  }
+  return cfg;
 }
+
+// ---------------------------------------------------------------- parsing
 
 // Extracts what the gate/audit need from a TEMPLATE.md-conformant spec:
 // Task ID and Model hint from Meta, Touch paths from the `### Touch` table.
@@ -133,29 +199,87 @@ const MATCH_VECTORS = [
 
 // ---------------------------------------------------------------- parse checks
 
-const SAMPLE_CONFIG = `# Lanes config
-<!-- comment spanning
-lines -->
-## App root
-app_subdir: myapp
-command_prefix: cd myapp &&
+// A schema-v1 config that must validate clean. SCHEMA_VECTORS mutate
+// clones of it to probe each validation rule (spec §2).
+const VALID_CONFIG = {
+  schema_version: 1,
+  project: { app_subdir: "myapp", command_prefix: "cd myapp &&" },
+  commands: {
+    test: "pnpm vitest run",
+    lint: "pnpm eslint",
+    typecheck: "pnpm tsc --noEmit",
+    acceptance_runner: "pnpm vitest run",
+  },
+  backend: {
+    name: "codex-mcp",
+    dispatch_tool: "mcp__codex__codex",
+    reply_tool: "mcp__codex__codex-reply",
+    approval_mode: "pilot",
+    tiers: ["sol", "terra", "luna"],
+    ratelimit_signal: ["usage-cap", "429", "rate limit"],
+  },
+  routing: {
+    security_routed: ["src/auth.ts", "prisma/migrations/**"],
+    do_not_touch: ["pnpm-lock.yaml", ".env"],
+  },
+  pipeline: {
+    plans_dir: "docs/superpowers/plans",
+    tasks_dir: "docs/superpowers/tasks",
+    ledger: ".superpowers/sdd/progress.md",
+  },
+};
 
-test: pnpm vitest run
-approval_mode: pilot    # trailing comment
+// [label, mutate(clone), expected error substring | null (= must be valid)]
+const SCHEMA_VECTORS = [
+  ["valid config", () => {}, null],
+  ["review_suite present", (c) => {
+    c.review_suite = {
+      suite_command: "pnpm test:ux",
+      id_pattern: "<id>-",
+      id_index: "docs/workflows.md",
+      route_map: { "src/app/admin/**": ["a1", "a2"] },
+    };
+  }, null],
+  ["empty lint allowed", (c) => { c.commands.lint = ""; }, null],
+  ["empty routing lists allowed", (c) => {
+    c.routing.security_routed = [];
+    c.routing.do_not_touch = [];
+  }, null],
+  ["misspelled key", (c) => {
+    c.routing.securty_routed = c.routing.security_routed;
+    delete c.routing.security_routed;
+  }, "unknown key"],
+  ["unknown top-level key", (c) => { c.extra = 1; }, "unknown key 'extra'"],
+  ["schema_version as string", (c) => { c.schema_version = "1"; }, "schema_version"],
+  ["schema_version wrong number", (c) => { c.schema_version = 2; }, "schema_version"],
+  ["missing required block", (c) => { delete c.backend; }, "required block 'backend'"],
+  ["wrong type for tiers", (c) => { c.backend.tiers = "sol"; }, "array of strings"],
+  ["bad approval_mode", (c) => { c.backend.approval_mode = "yolo"; }, "approval_mode"],
+  ["empty tiers", (c) => { c.backend.tiers = []; }, "non-empty"],
+  ["empty test command", (c) => { c.commands.test = ""; }, "commands.test"],
+  ["route_map value not an array", (c) => {
+    c.review_suite = {
+      suite_command: "x", id_pattern: "<id>-", id_index: "y",
+      route_map: { "a/**": "a1" },
+    };
+  }, "route_map"],
+];
 
-security_routed:
-  - src/auth.ts
-  - prisma/migrations/**
-
-do_not_touch:
-  - pnpm-lock.yaml
-  - .env
-
-## Notes
-  - stray item that must NOT join any list
-
-tasks_dir: docs/superpowers/tasks
-`;
+function runSchemaChecks() {
+  let failures = 0;
+  for (const [label, mutate, want] of SCHEMA_VECTORS) {
+    const cfg = structuredClone(VALID_CONFIG);
+    mutate(cfg);
+    const errors = validateConfig(cfg);
+    const ok = want === null ? errors.length === 0 : errors.some((e) => e.includes(want));
+    if (!ok) {
+      failures++;
+      console.error(`FAIL schema[${label}]: got ${JSON.stringify(errors)}, expected ${
+        want === null ? "no errors" : `an error containing ${JSON.stringify(want)}`}`);
+    }
+  }
+  return failures;
+}
 
 const SAMPLE_SPEC = `# TASK: sample
 ## Meta
@@ -183,11 +307,6 @@ function runParseChecks() {
       console.error(`FAIL ${label}: got ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
     }
   };
-  const cfg = parseConfig(SAMPLE_CONFIG);
-  expect("config.security_routed", cfg.lists.security_routed, ["src/auth.ts", "prisma/migrations/**"]);
-  expect("config.do_not_touch", cfg.lists.do_not_touch, ["pnpm-lock.yaml", ".env"]);
-  expect("config.tasks_dir", cfg.scalars.tasks_dir, "docs/superpowers/tasks");
-  expect("config.approval_mode", cfg.scalars.approval_mode, "pilot"); // trailing comment stripped
   const spec = parseSpec(SAMPLE_SPEC);
   expect("spec.taskId", spec.taskId, "DEMO.03");
   expect("spec.modelHint", spec.modelHint, "luna");
@@ -198,7 +317,7 @@ function runParseChecks() {
 // ---------------------------------------------------------------- selftest
 
 function runSelftest() {
-  let failures = runParseChecks();
+  let failures = runParseChecks() + runSchemaChecks();
   for (const [pattern, p, expected] of MATCH_VECTORS) {
     const got = matchesPattern(pattern, p);
     if (got !== expected) {
@@ -207,7 +326,7 @@ function runSelftest() {
     }
   }
   console.log(failures === 0
-    ? `selftest OK (${MATCH_VECTORS.length} match vectors + parse checks)`
+    ? `selftest OK (${MATCH_VECTORS.length} match vectors + ${SCHEMA_VECTORS.length} schema vectors + parse checks)`
     : `selftest: ${failures} failure(s)`);
   process.exit(failures === 0 ? 0 : 2);
 }
@@ -295,7 +414,7 @@ function runGate(specPathArg) {
   }
 
   // Clean baseline except pipeline allowlist (§3.1 check 2, §2 decision 3).
-  const allowlist = [".lanes", config.tasks_dir, config.plans_dir, config.ledger];
+  const allowlist = [".lanes", config.pipeline.tasks_dir, config.pipeline.plans_dir, config.pipeline.ledger];
   const dirty = [];
   for (const line of git("status", "--porcelain", "--untracked-files=all").split("\n")) {
     if (!line.trim()) continue;
@@ -321,7 +440,7 @@ function runGate(specPathArg) {
     if (!resolvedInsideRepo(p, rootReal)) {
       gateFail("security_gate", `Touch path resolves outside the repo (symlink escape or unresolvable): ${t}`);
     }
-    for (const [list, patterns] of [["security_routed", config.security_routed], ["do_not_touch", config.do_not_touch]]) {
+    for (const [list, patterns] of [["security_routed", config.routing.security_routed], ["do_not_touch", config.routing.do_not_touch]]) {
       const hit = matchAny(patterns, p);
       if (hit) {
         gateFail("security_gate",
@@ -386,7 +505,7 @@ function runAudit(taskIdArg) {
     if (p.trim()) changed.add(normalizePath(p));
   }
 
-  const allowlist = [".lanes", config.tasks_dir, config.plans_dir, config.ledger];
+  const allowlist = [".lanes", config.pipeline.tasks_dir, config.pipeline.plans_dir, config.pipeline.ledger];
   const report = {
     task: state.task,
     base_sha: state.base_sha,
@@ -396,8 +515,8 @@ function runAudit(taskIdArg) {
   };
   for (const p of [...changed].sort()) {
     // Deny beats allow (§6.7): forbidden wins even over the pipeline allowlist.
-    const secHit = matchAny(config.security_routed, p);
-    const dntHit = secHit ? null : matchAny(config.do_not_touch, p);
+    const secHit = matchAny(config.routing.security_routed, p);
+    const dntHit = secHit ? null : matchAny(config.routing.do_not_touch, p);
     if (secHit || dntHit) {
       report.forbidden.push({ path: p, list: secHit ? "security_routed" : "do_not_touch", pattern: secHit || dntHit });
     } else if (matchAny(allowlist, p)) {
