@@ -84,6 +84,11 @@ disposal of un-integrated work must be deliberate), then `git branch -d`
 reported as `branch_removed: false`). Prints
 `{ ok: true, task, removed, branch, branch_removed }`.
 
+Recovery: when the worktree directory was deleted manually but git still
+registers it, `remove` runs `git worktree prune`, proceeds to branch
+cleanup, and reports `pruned: true`; a task with neither a registration
+nor a branch is still a refusal.
+
 ## 5. Hook: `LANES-WORKTREE` header
 
 The dispatch-prompt contract gains an optional second line, immediately
@@ -145,6 +150,12 @@ of a stale worktree.
    the worktree → `violations` with `commits_past_base`.
 6. `worktree remove`: refuses while the worktree holds uncommitted
    changes (exit 2), succeeds with `--force`; directory gone.
+7. Enforcement hardening (added by the final-review fix wave): a
+   tampered worktree config cannot launder a `security_routed` edit
+   (audit still flags it from the main tree's config); `create`
+   refreshes stale dispatch inputs (worktree spec equals the main
+   working copy); `remove` prunes a manually deleted worktree and the
+   task id is creatable again.
 
 Hook header logic is not integration-tested (no PreToolUse harness);
 its worktree-membership check is deliberately thin and reviewed code.
