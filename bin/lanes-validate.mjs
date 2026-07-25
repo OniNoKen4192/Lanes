@@ -838,7 +838,30 @@ function ensureExcluded(root) {
   }
 }
 
-function runWorktreeCreate(specPathArg) {
+// Snapshot dispatch inputs from the MAIN working tree into a worktree,
+// overwriting the checkout's committed versions when they differ — the
+// operator's current spec/config always win over stale committed
+// copies. (The gate and audit read config from the main tree
+// regardless; the worktree copy is a convenience snapshot for prose
+// readers.)
+function syncIn(srcRel, destAbs) {
+  fs.mkdirSync(path.dirname(destAbs), { recursive: true });
+  if (!fs.existsSync(destAbs)
+      || !fs.readFileSync(srcRel).equals(fs.readFileSync(destAbs))) {
+    fs.copyFileSync(srcRel, destAbs);
+  }
+}
+
+// Resolve a --base ref to a commit, fail-closed (design spec
+// 2026-07-25-highways-streams §4: task branches cut from the stream
+// branch, stream branches from the run's base commit).
+function resolveBase(baseArg) {
+  const ref = baseArg ?? "HEAD";
+  try { return git("rev-parse", "--verify", `${ref}^{commit}`); }
+  catch { wtFail(`--base does not name a commit: ${ref}`); }
+}
+
+function runWorktreeCreate(specPathArg, baseArg) {
   if (!specPathArg) { console.error("worktree create: --spec <path> required"); process.exit(1); }
   const root = git("rev-parse", "--show-toplevel");
   process.chdir(root);
@@ -860,33 +883,52 @@ function runWorktreeCreate(specPathArg) {
     wtFail(`branch already exists: ${branch} — integrate or delete it first`);
   }
   ensureExcluded(root);
-  const base_sha = git("rev-parse", "HEAD");
-  git("worktree", "add", wtPath, "-b", branch, "HEAD");
-  // Snapshot dispatch inputs from the MAIN working tree into the
-  // worktree, overwriting the checkout's committed versions when they
-  // differ — the operator's current spec/config always win over stale
-  // committed copies. Both paths are baseline-allowlisted. (The gate and
-  // audit read config from the main tree regardless; the worktree copy
-  // is a convenience snapshot for prose readers.)
-  const syncIn = (srcRel, destAbs) => {
-    fs.mkdirSync(path.dirname(destAbs), { recursive: true });
-    if (!fs.existsSync(destAbs)
-        || !fs.readFileSync(srcRel).equals(fs.readFileSync(destAbs))) {
-      fs.copyFileSync(srcRel, destAbs);
-    }
-  };
+  const base_sha = resolveBase(baseArg);
+  git("worktree", "add", wtPath, "-b", branch, base_sha);
   syncIn(specPath, path.join(wtPath, specPath));
   syncIn(path.join(".lanes", "config.json"), path.join(wtPath, ".lanes", "config.json"));
   console.log(JSON.stringify({ ok: true, task: spec.taskId, path: wtPath, branch, base_sha }));
 }
 
-function runWorktreeRemove(taskIdArg, force) {
-  if (!taskIdArg) { console.error("worktree remove: --task <id> required"); process.exit(1); }
+// Stream worktrees (design spec 2026-07-25-highways-streams §4): the
+// per-stream working tree a highway run merges task branches into.
+// Fixed conventions: worktree at .lanes/worktrees/stream-<id>, branch
+// highway/<id>. The id "integration" is reserved in the stream MAP for
+// the run's integration worktree — this subcommand creates it like any
+// other stream.
+function runWorktreeCreateStream(streamIdArg, baseArg) {
+  if (!streamIdArg) { console.error("worktree create: --stream <id> required"); process.exit(1); }
   const root = git("rev-parse", "--show-toplevel");
   process.chdir(root);
-  const taskFile = taskIdArg.replace(/[^A-Za-z0-9._-]/g, "_");
-  const wtPath = `.lanes/worktrees/${taskFile}`;
-  const branch = `lanes/${taskFile}`;
+  if (path.resolve(mainRepoRoot()) !== path.resolve(root)) {
+    wtFail("worktree create must run from the main working tree, not a linked worktree");
+  }
+  try { loadConfig(); } catch (err) { wtFail(String(err.message || err)); }
+  const streamFile = streamIdArg.replace(/[^A-Za-z0-9._-]/g, "_");
+  const branch = `highway/${streamFile}`;
+  const wtPath = `.lanes/worktrees/stream-${streamFile}`;
+  if (fs.existsSync(wtPath)) {
+    wtFail(`worktree already exists: ${wtPath} — run 'worktree remove --stream ${streamIdArg}' first`);
+  }
+  if (git("branch", "--list", branch).trim()) {
+    wtFail(`branch already exists: ${branch} — integrate or delete it first`);
+  }
+  ensureExcluded(root);
+  const base_sha = resolveBase(baseArg);
+  git("worktree", "add", wtPath, "-b", branch, base_sha);
+  syncIn(path.join(".lanes", "config.json"), path.join(wtPath, ".lanes", "config.json"));
+  console.log(JSON.stringify({ ok: true, stream: streamIdArg, path: wtPath, branch, base_sha }));
+}
+
+function runWorktreeRemove(idArg, force, kind) {
+  const flag = kind === "stream" ? "--stream" : "--task";
+  if (!idArg) { console.error(`worktree remove: ${flag} <id> required`); process.exit(1); }
+  const root = git("rev-parse", "--show-toplevel");
+  process.chdir(root);
+  const idFile = idArg.replace(/[^A-Za-z0-9._-]/g, "_");
+  const wtPath = kind === "stream" ? `.lanes/worktrees/stream-${idFile}` : `.lanes/worktrees/${idFile}`;
+  const branch = kind === "stream" ? `highway/${idFile}` : `lanes/${idFile}`;
+  const idKey = kind === "stream" ? "stream" : "task";
   if (!fs.existsSync(wtPath)) {
     // Directory manually deleted? If git still registers it, prune the
     // stale registration and fall through to branch cleanup; a task that
@@ -903,7 +945,7 @@ function runWorktreeRemove(taskIdArg, force) {
     if (branchExists) {
       try { git("branch", "-d", branch); branchRemoved = true; } catch { branchRemoved = false; }
     }
-    console.log(JSON.stringify({ ok: true, task: taskIdArg, removed: wtPath, pruned: registered, branch, branch_removed: branchRemoved }));
+    console.log(JSON.stringify({ ok: true, [idKey]: idArg, removed: wtPath, pruned: registered, branch, branch_removed: branchRemoved }));
     return;
   }
   try {
@@ -916,7 +958,7 @@ function runWorktreeRemove(taskIdArg, force) {
   }
   let branchRemoved = true;
   try { git("branch", "-d", branch); } catch { branchRemoved = false; } // unmerged — kept deliberately
-  console.log(JSON.stringify({ ok: true, task: taskIdArg, removed: wtPath, branch, branch_removed: branchRemoved }));
+  console.log(JSON.stringify({ ok: true, [idKey]: idArg, removed: wtPath, branch, branch_removed: branchRemoved }));
 }
 
 // ---------------------------------------------------------------- CLI
@@ -933,10 +975,12 @@ try {
   else if (cmd === "audit") runAudit(argOf("--task"));
   else if (cmd === "attention") runAttention(argOf("--spec"));
   else if (cmd === "doctor") runDoctor();
-  else if (cmd === "worktree" && rest[0] === "create") runWorktreeCreate(argOf("--spec"));
-  else if (cmd === "worktree" && rest[0] === "remove") runWorktreeRemove(argOf("--task"), rest.includes("--force"));
+  else if (cmd === "worktree" && rest[0] === "create" && rest.includes("--stream")) runWorktreeCreateStream(argOf("--stream"), argOf("--base"));
+  else if (cmd === "worktree" && rest[0] === "create") runWorktreeCreate(argOf("--spec"), argOf("--base"));
+  else if (cmd === "worktree" && rest[0] === "remove" && rest.includes("--stream")) runWorktreeRemove(argOf("--stream"), rest.includes("--force"), "stream");
+  else if (cmd === "worktree" && rest[0] === "remove") runWorktreeRemove(argOf("--task"), rest.includes("--force"), "task");
   else {
-    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | attention --spec <path> | doctor | worktree create --spec <path> | worktree remove --task <id> [--force] | selftest>");
+    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | doctor | attention --spec <path> | worktree create --spec <path> [--base <ref>] | worktree create --stream <id> [--base <ref>] | worktree remove --task <id> [--force] | worktree remove --stream <id> [--force] | selftest>");
     process.exit(1);
   }
 } catch (err) {

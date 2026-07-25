@@ -251,3 +251,81 @@ describe("worktree remove: refuses dirty, --force succeeds", () => {
     assert.ok(!fs.existsSync(wt), `expected worktree dir to be gone: ${wt}`);
   });
 });
+
+describe("worktree create --base: task branch cut from named ref", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree create --base: task branch cut from named ref", () => {
+    fs.writeFileSync(path.join(fx.dir, "docs", "tasks", "T2.md"), T2_SPEC);
+    gitC(fx.dir, "branch", "streambase");
+    fs.appendFileSync(path.join(fx.dir, "src", "lib", "thing.js"), "// advance main\n");
+    fx.commit("advance main");
+    const baseSha = gitC(fx.dir, "rev-parse", "streambase");
+    assert.notEqual(baseSha, gitC(fx.dir, "rev-parse", "HEAD"));
+
+    const r = validate(fx.dir, "worktree", "create", "--spec", "docs/tasks/T2.md", "--base", "streambase");
+    assert.equal(r.status, 0, `worktree create --base failed: ${r.stdout} ${r.stderr}`);
+    assert.equal(r.json.base_sha, baseSha);
+    assert.equal(gitC(fx.dir, "rev-parse", "lanes/T2"), baseSha);
+  });
+});
+
+describe("worktree create --base: unknown ref refused", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree create --base: unknown ref refused", () => {
+    fs.writeFileSync(path.join(fx.dir, "docs", "tasks", "T2.md"), T2_SPEC);
+    const r = validate(fx.dir, "worktree", "create", "--spec", "docs/tasks/T2.md", "--base", "no-such-ref");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.check, "worktree");
+    assert.ok(r.json.reason.includes("--base"), `expected reason to mention --base, got: ${r.json.reason}`);
+  });
+});
+
+describe("worktree create --stream: golden", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree create --stream: golden", () => {
+    const r = validate(fx.dir, "worktree", "create", "--stream", "s1");
+    assert.equal(r.status, 0, `worktree create --stream failed: ${r.stdout} ${r.stderr}`);
+    assert.equal(r.json.ok, true);
+    assert.equal(r.json.stream, "s1");
+    assert.equal(np(r.json.path), ".lanes/worktrees/stream-s1");
+    assert.equal(r.json.branch, "highway/s1");
+    assert.match(r.json.base_sha, HEX40);
+
+    const wtDir = path.join(fx.dir, ".lanes", "worktrees", "stream-s1");
+    assert.ok(fs.existsSync(wtDir), `expected stream worktree dir: ${wtDir}`);
+    assert.ok(gitC(fx.dir, "branch", "--list", "highway/s1").trim().length > 0, "expected highway/s1 branch");
+    assert.ok(fs.existsSync(path.join(wtDir, ".lanes", "config.json")), "expected config snapshot in stream worktree");
+  });
+});
+
+describe("worktree create --stream: no clobber", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree create --stream: no clobber", () => {
+    assert.equal(validate(fx.dir, "worktree", "create", "--stream", "s1").status, 0);
+    const r = validate(fx.dir, "worktree", "create", "--stream", "s1");
+    assert.equal(r.status, 2);
+    assert.ok(r.json.reason.includes("already exists"), `got: ${r.json.reason}`);
+  });
+});
+
+describe("worktree remove --stream: clean removal", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree remove --stream: clean removal", () => {
+    assert.equal(validate(fx.dir, "worktree", "create", "--stream", "s1").status, 0);
+    const r = validate(fx.dir, "worktree", "remove", "--stream", "s1");
+    assert.equal(r.status, 0, `worktree remove --stream failed: ${r.stdout} ${r.stderr}`);
+    assert.equal(r.json.ok, true);
+    assert.equal(r.json.stream, "s1");
+    assert.ok(!fs.existsSync(path.join(fx.dir, ".lanes", "worktrees", "stream-s1")), "expected stream worktree gone");
+  });
+});
