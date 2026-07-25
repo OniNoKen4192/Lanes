@@ -4,6 +4,7 @@ description: >
   end-to-end unattended — emit, dispatch, review, act on verdicts,
   merge — parking anything that needs a human. Requires
   `.lanes/config.json` to declare `automation.level: "conveyor"`.
+argument-hint: <path-to-approved-plan>
 ---
 
 # /lanes-run <plan> — the conveyor

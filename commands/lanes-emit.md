@@ -26,7 +26,7 @@ wins.
   KEEP-routed tasks.
 - **You emit; you do not dispatch.** Never invoke `lanes-implementer`, the
   configured DELEGATE backend's tools, or any subagent from this command.
-  Dispatch is a separate, human-initiated step.
+  Dispatch is a separate step this command never performs.
 - **Never modify**: the plan file, the plugin's `templates/TEMPLATE.md`,
   the project's `AGENTS.md`, `agents/*.md`, the superpowers plugin, or
   anything under `.superpowers/sdd/`. If any of them is wrong or
