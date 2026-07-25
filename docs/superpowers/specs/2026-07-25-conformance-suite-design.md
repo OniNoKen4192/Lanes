@@ -57,10 +57,10 @@ Decisions (mine, per the standing delegation):
   TEMPLATE-conformant spec file at `docs/tasks/T1.md` (Task ID `T1`,
   Model hint `beta`, Touch: `src/lib/thing.js` + a test file). `opts`
   overrides let a test patch config fields or the spec text before commit.
-- `validate(dir, ...args) → { status, stdout, json }`: spawns
+- `validate(dir, ...args) → { status, stdout, stderr, json }`: spawns
   `node <repo>/bin/lanes-validate.mjs <args>` with cwd `dir`, captures
-  exit code and stdout, parses JSON when the output is JSON. Never throws
-  on non-zero exit.
+  exit code, stdout, and stderr, parses JSON when the output is JSON.
+  Never throws on non-zero exit.
 - `read(relPath)` — reads a repo file from the real Lanes checkout (root
   resolved from `import.meta.url`), for the structural tests.
 
