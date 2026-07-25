@@ -402,3 +402,21 @@ test("roundabout: /lanes-run command structure", () => {
   }
   assert.ok(!cmd.includes("git push"), "the conveyor must never push to a remote");
 });
+
+test("roundabout: SKILL.md references the automation ladder", () => {
+  const skill = read("skills/lanes/SKILL.md");
+  assert.ok(skill.includes("/lanes-run"), "SKILL.md should reference /lanes-run");
+  assert.ok(skill.includes("automation.level"), "SKILL.md should reference automation.level");
+});
+
+test("roundabout: config examples document automation", () => {
+  const json = JSON.parse(read("templates/config.example.json"));
+  assert.equal(json.automation.level, "manual",
+    "the example must not model turning automation on by default");
+  assert.equal(json.automation.max_fix_rounds, 2);
+  const md = read("templates/config.example.md");
+  assert.ok(md.includes("## `automation`"), "config.example.md should have an automation section");
+  for (const term of ["manual", "verdicts", "conveyor", "max_fix_rounds"]) {
+    assert.ok(md.includes(term), `config.example.md should document ${JSON.stringify(term)}`);
+  }
+});

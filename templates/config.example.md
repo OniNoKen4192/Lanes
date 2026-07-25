@@ -113,15 +113,26 @@ just the `acceptance_runner`.
 finds an existing `docs/superpowers/` or `.superpowers/sdd/` layout with
 different paths.
 
-## `automation`  (optional — omit if using manual/default mode)
+## `automation`  (optional — omit for today's fully-manual behavior)
 
-- `level` (string, enum): `"manual"` (reviewer-driven), `"verdicts"`
-  (auto-commit on verdicts), or `"conveyor"` (auto-implement + commit).
-  Default: `"manual"`.
-- `max_fix_rounds` (number, optional, ≥1): maximum fix iteration rounds
-  in conveyor and verdicts modes. Default: `2`.
+The Roundabout trust ladder: how much of the pipeline runs unattended.
+Trust is DECLARED — you flip this when you judge the project ready; the
+ledger history is evidence you consult, not a mechanism.
 
-Omit the whole block for manual-mode defaults.
+- `level` (string): exactly one of
+  - `"manual"` — every stage change is a human handoff (the default;
+    an absent block means exactly this).
+  - `"verdicts"` — you still emit and dispatch each spec; reviewer
+    verdicts are acted on unattended (APPROVE → merge + clean up,
+    FIX → re-dispatch up to the cap). REJECT always stops for you.
+  - `"conveyor"` — `/lanes-run <plan>` drives the whole task graph
+    end-to-end; see that command for park semantics.
+- `max_fix_rounds` (integer ≥ 1, optional, default `2`): how many FIX
+  rounds a task gets before it parks as needs-human.
+
+The safety floor holds at every level: security-routed work never runs
+unattended, REJECT is always a human decision, and nothing is ever
+pushed to a remote.
 
 ## Migrating from the legacy `.lanes/config.md`
 

@@ -50,6 +50,10 @@ the plan is executed and reviewed exactly the way superpowers already does
 it — no spec file, no `lanes-implementer`, no `lanes-reviewer`. Lanes only
 ever inserts itself into the DELEGATE-routed tasks' path.
 
+When the project's `.lanes/config.json` declares an `automation.level`
+above `"manual"`, the handoffs between these stages run unattended per
+the Roundabout trust ladder — see Section C item 6 and `/lanes-run`.
+
 ## Section B — the planning hook (load-bearing)
 
 When writing a plan (superpowers `writing-plans`) in a Lanes project:
@@ -111,6 +115,18 @@ Once the plan is approved:
    inner loop and review).
 5. Respect `Depends on` ordering throughout: don't dispatch a task whose
    dependency hasn't landed, whichever lane either one is in.
+
+6. **Automation (Roundabout).** All of the above assumes
+   `automation.level: "manual"` (or no `automation` block) — every
+   handoff is yours. At `"verdicts"`, handle reviewer verdicts
+   unattended: APPROVE → commit in the worktree, merge, remove; FIX →
+   apply the delta spec and re-dispatch, up to
+   `automation.max_fix_rounds` rounds, then park for the human; REJECT
+   → always stop for the human. At `"conveyor"`, run
+   `/lanes-run <plan>` instead of stepping through items 1–5 manually —
+   it drives the whole Task/Lane Map and parks anything needing a
+   human. At every level: security-routed work never runs unattended,
+   and nothing is ever pushed to a remote.
 
 ## Section D — prerequisites
 
