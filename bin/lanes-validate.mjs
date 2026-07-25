@@ -582,7 +582,7 @@ function onPath(bin) {
   for (const dir of (process.env.PATH || "").split(path.delimiter)) {
     if (!dir) continue;
     for (const ext of ["", ...exts]) {
-      try { fs.accessSync(path.join(dir, bin + ext)); return true; } catch {}
+      try { if (fs.statSync(path.join(dir, bin + ext)).isFile()) return true; } catch {}
     }
   }
   return false;

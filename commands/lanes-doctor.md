@@ -38,7 +38,8 @@ Check which config files exist in `.lanes/`:
      pipe character with each substring trimmed; `security_routed`/
      `do_not_touch` → `routing.*`; the `review_suite` block →
      `review_suite.*` (omit the whole block if the legacy file has
-     none); `plans_dir`/`tasks_dir`/`ledger` → `pipeline.*`. Carry
+     none); `plans_dir`/`tasks_dir`/`ledger` → `pipeline.*`. Add
+     `schema_version: 1` — it has no legacy counterpart. Carry
      values verbatim — this is a format conversion, not a
      re-inspection. A legacy field you cannot map, or a required field
      the legacy file lacks, is a question for the user — never a

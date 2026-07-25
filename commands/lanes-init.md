@@ -123,7 +123,7 @@ order:
    assumed.
 2. **Backend + tiers.** Confirm the delegate backend and its tier names.
    Default to the backend and the three example tier names already shown
-   in `config.example.md` (best → cheapest), and offer to rename the tiers
+   in `config.example.json` (best → cheapest), and offer to rename the tiers
    to whatever labels the user prefers.
 3. **`app_subdir` / `command_prefix`.** Confirm the Phase 1 proposal, or
    ask directly if Phase 1 found no clear single app root (e.g. more than
