@@ -83,8 +83,9 @@ const SCHEMA_V1 = {
     route_map: "route_map",
   },
   pipeline: { plans_dir: "string", tasks_dir: "string", ledger: "string" },
+  automation: { level: "string", max_fix_rounds: "posint?" },
 };
-const OPTIONAL_BLOCKS = new Set(["review_suite"]);
+const OPTIONAL_BLOCKS = new Set(["review_suite", "automation"]);
 
 function isStringArray(v) {
   return Array.isArray(v) && v.every((x) => typeof x === "string");
@@ -117,7 +118,9 @@ function validateConfig(cfg) {
     for (const [key, type] of Object.entries(fields)) {
       const v = val[key];
       if (v === undefined) {
-        errors.push(`required field '${block}.${key}' is missing`);
+        if (!type.endsWith("?")) errors.push(`required field '${block}.${key}' is missing`);
+      } else if (type === "posint?" && !(Number.isInteger(v) && v >= 1)) {
+        errors.push(`'${block}.${key}' must be an integer >= 1`);
       } else if (type === "string" && typeof v !== "string") {
         errors.push(`'${block}.${key}' must be a string`);
       } else if (type === "string[]" && !isStringArray(v)) {
@@ -132,6 +135,9 @@ function validateConfig(cfg) {
   if (errors.length) return errors; // field rules below assume the structure above held
   if (cfg.backend.approval_mode !== "pilot" && cfg.backend.approval_mode !== "automated") {
     errors.push(`'backend.approval_mode' must be "pilot" or "automated", got ${JSON.stringify(cfg.backend.approval_mode)}`);
+  }
+  if (cfg.automation && !["manual", "verdicts", "conveyor"].includes(cfg.automation.level)) {
+    errors.push(`'automation.level' must be "manual", "verdicts", or "conveyor", got ${JSON.stringify(cfg.automation.level)}`);
   }
   if (cfg.backend.tiers.length === 0) errors.push("'backend.tiers' must be a non-empty array");
   for (const key of ["test", "acceptance_runner"]) {
@@ -159,6 +165,12 @@ function loadConfig(rootDir = ".") {
   if (errors.length) {
     throw new Error(`.lanes/config.json failed schema v1 validation: ${errors.join("; ")}`);
   }
+  // Normalize (design spec 2026-07-25-roundabout-automation §2): downstream
+  // consumers never branch on absence — automation is always present.
+  cfg.automation = {
+    level: cfg.automation?.level ?? "manual",
+    max_fix_rounds: cfg.automation?.max_fix_rounds ?? 2,
+  };
   return cfg;
 }
 
@@ -283,6 +295,15 @@ const SCHEMA_VECTORS = [
       route_map: { "a/**": "a1" },
     };
   }, "route_map"],
+  ["automation manual", (c) => { c.automation = { level: "manual" }; }, null],
+  ["automation verdicts", (c) => { c.automation = { level: "verdicts" }; }, null],
+  ["automation conveyor with cap", (c) => { c.automation = { level: "conveyor", max_fix_rounds: 3 }; }, null],
+  ["automation absent is valid", (c) => { delete c.automation; }, null],
+  ["automation bad level", (c) => { c.automation = { level: "yolo" }; }, "automation.level"],
+  ["automation missing level", (c) => { c.automation = { max_fix_rounds: 2 }; }, "required field 'automation.level'"],
+  ["automation unknown key", (c) => { c.automation = { level: "manual", turbo: true }; }, "unknown key 'automation.turbo'"],
+  ["automation zero cap", (c) => { c.automation = { level: "conveyor", max_fix_rounds: 0 }; }, "integer >= 1"],
+  ["automation string cap", (c) => { c.automation = { level: "conveyor", max_fix_rounds: "2" }; }, "integer >= 1"],
 ];
 
 function runSchemaChecks() {

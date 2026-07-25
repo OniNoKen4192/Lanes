@@ -121,6 +121,7 @@ test("§5.5 config vocabulary sync", () => {
     routing: ["security_routed", "do_not_touch"],
     review_suite: ["suite_command", "id_pattern", "id_index", "route_map"],
     pipeline: ["plans_dir", "tasks_dir", "ledger"],
+    automation: ["level", "max_fix_rounds"],
   };
 
   // (a) templates/config.example.json key paths equal VOCAB exactly.

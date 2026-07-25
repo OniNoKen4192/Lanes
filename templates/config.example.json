@@ -78,5 +78,9 @@
     "plans_dir": "docs/superpowers/plans",
     "tasks_dir": "docs/superpowers/tasks",
     "ledger": ".superpowers/sdd/progress.md"
+  },
+  "automation": {
+    "level": "manual",
+    "max_fix_rounds": 2
   }
 }

@@ -113,6 +113,16 @@ just the `acceptance_runner`.
 finds an existing `docs/superpowers/` or `.superpowers/sdd/` layout with
 different paths.
 
+## `automation`  (optional — omit if using manual/default mode)
+
+- `level` (string, enum): `"manual"` (reviewer-driven), `"verdicts"`
+  (auto-commit on verdicts), or `"conveyor"` (auto-implement + commit).
+  Default: `"manual"`.
+- `max_fix_rounds` (number, optional, ≥1): maximum fix iteration rounds
+  in conveyor and verdicts modes. Default: `2`.
+
+Omit the whole block for manual-mode defaults.
+
 ## Migrating from the legacy `.lanes/config.md`
 
 Projects configured before schema v1 have a free-form Markdown config.

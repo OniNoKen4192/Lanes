@@ -347,3 +347,44 @@ describe("doctor: clean fixture is ok", () => {
     assert.ok(r.json.checks.commands.commands.every((c) => ["pass", "warn"].includes(c.status)));
   });
 });
+
+describe("gate: valid automation block accepted", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.automation = { level: "conveyor", max_fix_rounds: 3 };
+  } });
+  after(() => fx.cleanup());
+
+  test("gate: valid automation block accepted", () => {
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 0);
+    assert.equal(r.json.ok, true);
+  });
+});
+
+describe("gate: bad automation level refused", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.automation = { level: "yolo" };
+  } });
+  after(() => fx.cleanup());
+
+  test("gate: bad automation level refused", () => {
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.notEqual(r.status, 0);
+    assert.ok((r.stdout + r.stderr).includes("automation.level"),
+      `expected an automation.level error, got: ${r.stdout} ${r.stderr}`);
+  });
+});
+
+describe("gate: unknown automation key refused", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.automation = { level: "manual", turbo: true };
+  } });
+  after(() => fx.cleanup());
+
+  test("gate: unknown automation key refused", () => {
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.notEqual(r.status, 0);
+    assert.ok((r.stdout + r.stderr).includes("automation.turbo"),
+      `expected an unknown-key error naming automation.turbo, got: ${r.stdout} ${r.stderr}`);
+  });
+});
