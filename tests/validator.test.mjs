@@ -168,6 +168,51 @@ describe("audit: spec edited after dispatch flagged", () => {
   });
 });
 
+describe("audit: appended amendments do not trip spec_modified", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("audit: appended amendments do not trip spec_modified", () => {
+    const g = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(g.status, 0);
+
+    // Fixture spec already ends in a single "\n" (see FIXTURE_SPEC in
+    // helpers.mjs), so the marker starts right after it — no leading "\n"
+    // here, or a spurious blank line would join the immutable body (the
+    // part specBody() returns) and trip spec_modified on its own.
+    fs.appendFileSync(
+      path.join(fx.dir, "docs", "tasks", "T1.md"),
+      "## Amendments\n\n### A1 — 2026-07-25 — accepted deviation\n- **Deviation**: example\n",
+    );
+    fs.appendFileSync(path.join(fx.dir, "src", "lib", "thing.js"), "// edited\n");
+
+    const r = validate(fx.dir, "audit", "--task", "T1");
+    assert.equal(r.status, 0);
+    assert.equal(r.json.verdict, "clean");
+    assert.equal(r.json.spec_modified, false);
+  });
+});
+
+describe("audit: body edit plus amendments still trips spec_modified", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("audit: body edit plus amendments still trips spec_modified", () => {
+    const g = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(g.status, 0);
+
+    const specPath = path.join(fx.dir, "docs", "tasks", "T1.md");
+    const tampered = fs.readFileSync(specPath, "utf8").replace("## Meta", "## Meta\n<!-- tampered -->")
+      + "\n## Amendments\n\n### A1 — 2026-07-25 — accepted deviation\n- **Deviation**: example\n";
+    fs.writeFileSync(specPath, tampered);
+
+    const r = validate(fx.dir, "audit", "--task", "T1");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.verdict, "violations");
+    assert.equal(r.json.spec_modified, true);
+  });
+});
+
 describe("audit: forbidden edit flagged", () => {
   const fx = makeFixtureRepo();
   after(() => fx.cleanup());

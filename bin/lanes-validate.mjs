@@ -175,6 +175,15 @@ function parseSpec(text) {
   return { taskId, modelHint, touch };
 }
 
+// The immutable contract is everything ABOVE the "## Amendments" marker
+// (design spec 2026-07-25-immutable-specs §2). Amendments are an
+// append-only audit trail: hashing only the body lets the appendix grow
+// without tripping spec_modified, while any edit to the original
+// sections still trips it.
+function specBody(text) {
+  return text.split(/^## Amendments[ \t]*$/m)[0];
+}
+
 // Mirrors the examples table in docs/PATH-MATCHING.md — keep in sync.
 const MATCH_VECTORS = [
   // [pattern, path, expected]
@@ -488,7 +497,7 @@ function runGate(specPathArg) {
   const state = {
     task: spec.taskId,
     spec_path: specPath,
-    spec_sha256: sha256(specText),
+    spec_sha256: sha256(specBody(specText)),
     touch: spec.touch.map(normalizePath),
     base_sha: git("rev-parse", "HEAD"),
     dispatched_at: new Date().toISOString(),
@@ -543,7 +552,7 @@ function runAudit(taskIdArg) {
   const report = {
     task: state.task,
     base_sha: state.base_sha,
-    spec_modified: sha256(specText) !== state.spec_sha256,
+    spec_modified: sha256(specBody(specText)) !== state.spec_sha256,
     commits_past_base: git("rev-list", `${state.base_sha}..HEAD`).split("\n").filter(Boolean),
     in_scope: [], out_of_scope: [], forbidden: [], allowlisted: [],
   };
