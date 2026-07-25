@@ -750,7 +750,11 @@ function runDoctor() {
   }
 
   const failed = Object.values(checks).some((c) => c.status === "fail");
-  console.log(JSON.stringify({ verdict: failed ? "not_safe" : "ok", checks }, null, 2));
+  // Informational only (design spec 2026-07-25-roundabout-automation §6):
+  // the declared trust level is reported, never judged — not a check.
+  console.log(JSON.stringify(
+    { verdict: failed ? "not_safe" : "ok", automation: config ? config.automation : null, checks },
+    null, 2));
   process.exit(failed ? 2 : 0);
 }
 

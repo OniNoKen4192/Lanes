@@ -68,6 +68,10 @@ and sample (or its malformed-pattern error), each unresolved command's
 note, each dirty path. Do not re-derive any of these by judgment — the
 subcommand's output is the authority (matching semantics:
 `${CLAUDE_PLUGIN_ROOT}/docs/PATH-MATCHING.md`).
+Also render the report's top-level `automation` field as one
+informational line — the declared trust level and fix cap (defaults
+`manual` / `2` when the config has no `automation` block). It is
+information, not a check: it never affects the verdict.
 
 ## Step 2 — backend reachability (session-side)
 

@@ -388,3 +388,27 @@ describe("gate: unknown automation key refused", () => {
       `expected an unknown-key error naming automation.turbo, got: ${r.stdout} ${r.stderr}`);
   });
 });
+
+describe("doctor: reports declared automation level", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.automation = { level: "conveyor" };
+  } });
+  after(() => fx.cleanup());
+
+  test("doctor: reports declared automation level", () => {
+    const r = validate(fx.dir, "doctor");
+    assert.equal(r.json.automation.level, "conveyor");
+    assert.equal(r.json.automation.max_fix_rounds, 2);
+  });
+});
+
+describe("doctor: absent automation block reports manual", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("doctor: absent automation block reports manual", () => {
+    const r = validate(fx.dir, "doctor");
+    assert.equal(r.json.automation.level, "manual");
+    assert.equal(r.json.automation.max_fix_rounds, 2);
+  });
+});
