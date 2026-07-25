@@ -5,7 +5,7 @@ description: >
   project's `plans_dir`, validates each task's plan-assigned lane against
   the plugin's `templates/ROUTING.md` (the single routing authority), and
   emits one `templates/TEMPLATE.md`-conformant spec file per DELEGATE-routed
-  task into the project's `tasks_dir` (`.lanes/config.md`). KEEP-routed
+  task into the project's `tasks_dir` (`.lanes/config.json`). KEEP-routed
   tasks get NO spec file — they stay in the existing superpowers SDD inner
   loop.
 argument-hint: <path-to-approved-plan>
@@ -40,7 +40,7 @@ wins.
 1. `${CLAUDE_PLUGIN_ROOT}/templates/TEMPLATE.md` — the output contract.
    Resolve it via Bash, e.g. `cat "${CLAUDE_PLUGIN_ROOT}/templates/TEMPLATE.md"`.
    Every emitted spec conforms to it: all sections present, every command
-   carries the project's `command_prefix` (`.lanes/config.md`), the
+   carries the project's `command_prefix` (`.lanes/config.json`), the
    standing Do-NOT-touch exclusions repeated in each spec, "Affected
    workflow IDs" populated, and Planner Emission Rules 1–8 honored. Rule 7
    (security routing) is non-negotiable.
@@ -52,14 +52,14 @@ wins.
    facts, pipeline mode.
 4. `${CLAUDE_PLUGIN_ROOT}/agents/lanes-implementer.md` — its Phase 1 validation gate is the
    compiler for your output. Every spec you emit must pass all five items.
-5. The project's `review_suite.id_index` (`.lanes/config.md`) — the
+5. The project's `review_suite.id_index` (`.lanes/config.json`) — the
    coverage table mapping workflow/UX IDs to test specs. Source for
    "Affected workflow IDs". If the project has no `review_suite` block,
    "Affected workflow IDs" is always `none`.
 6. **The project's package manifest** — the ONLY authority on the command
    names used for acceptance/regression (cross-checked against `test` and
-   `acceptance_runner` in `.lanes/config.md`). If `TEMPLATE.md`, `AGENTS.md`,
-   or `.lanes/config.md` examples disagree with the manifest, use the
+   `acceptance_runner` in `.lanes/config.json`). If `TEMPLATE.md`, `AGENTS.md`,
+   or `.lanes/config.json` examples disagree with the manifest, use the
    manifest and report the mismatch; do not silently fix those files.
 7. The plan file at `$ARGUMENTS`, in full.
 
@@ -101,7 +101,7 @@ and validate it against ROUTING.md:
   (c) specifically, verify BOTH the `ratified:` marker and the full
   rejection-path acceptance criteria; missing either triggers the
   override.
-- **Tier disagreement only** (plan's DELEGATE tier — from `.lanes/config.md`
+- **Tier disagreement only** (plan's DELEGATE tier — from `.lanes/config.json`
   `tiers` — differs from your read) → the plan's tier wins; note the
   disagreement in Flags.
 - **Plan says KEEP but the task appears DELEGATE-eligible** under
@@ -120,7 +120,7 @@ KEEP and record why in Flags.
 
 ## Step 4 — Emit one spec per DELEGATE-routed task
 
-Write `<tasks_dir>/<task-id>.md` (`tasks_dir` from `.lanes/config.md`) for
+Write `<tasks_dir>/<task-id>.md` (`tasks_dir` from `.lanes/config.json`) for
 each DELEGATE-routed task (collision check first — see standing guards).
 Requirements beyond plain TEMPLATE.md conformance:
 
@@ -129,7 +129,7 @@ Requirements beyond plain TEMPLATE.md conformance:
   Task 3 → `POLISH-BATCH-YELLOW.03`.
 - **Meta**: Parent plan path; Depends on from Step 2 (task IDs, or "none");
   Estimated scope S/M/L by Touch-list size; Model hint = the final
-  lane/tier from Step 3 (a `.lanes/config.md` `tiers` name, or `keep` — a
+  lane/tier from Step 3 (a `.lanes/config.json` `tiers` name, or `keep` — a
   `keep` hint means this task should not have been emitted at all; treat
   that as a Step-3 bug and stop before writing the file; see Step 5
   item 1).
@@ -140,7 +140,7 @@ Requirements beyond plain TEMPLATE.md conformance:
   touch** = the union of all sibling tasks' Touch lists (name the owning
   task) + any file the task tests-but-must-not-modify + the standing
   exclusions block copied from TEMPLATE.md, sourced from the project's
-  `do_not_touch` and `security_routed` lists (`.lanes/config.md`). Never
+  `do_not_touch` and `security_routed` lists (`.lanes/config.json`). Never
   invent entries beyond that (Emission Rule 3).
 - **Interfaces**: real code. Read the actual source files the task
   consumes and copy exact current signatures; for produced code, exact
@@ -157,7 +157,7 @@ Requirements beyond plain TEMPLATE.md conformance:
   can't be extracted, that is the Interfaces trigger (ROUTING.md): route
   the task KEEP and record why in Flags.
 - **Acceptance**: test command built on the project's `command_prefix` and
-  `acceptance_runner` (`.lanes/config.md`), verified against the package
+  `acceptance_runner` (`.lanes/config.json`), verified against the package
   manifest; behavioral criteria each falsifiable and each covered by a
   named test; Emission Rule 4 satisfied — the command is runnable now and
   red, OR creating the test is the first Touch entry. "Affected workflow
@@ -215,7 +215,7 @@ End with, in this order:
 3. **Gate results** — per spec, the five items and what the acceptance
    command actually did when run.
 4. **Mismatches/frictions** — anything in TEMPLATE.md, AGENTS.md,
-   `.lanes/config.md`, or `agents/lanes-implementer.md` that disagreed with
+   `.lanes/config.json`, or `agents/lanes-implementer.md` that disagreed with
    reality (the package manifest wins). Report only; never edit them.
 5. **Reminder to the user**: dispatch order must respect Depends on.
    (Uncommitted spec files under `tasks_dir` are fine — the dispatch

@@ -11,7 +11,7 @@ disagrees with this file, this file wins.
 
 **(a) Security-critical files → KEEP.** A task whose Create/Modify list
 touches any file matching an entry in the project's `security_routed`
-list (`.lanes/config.md`) routes KEEP. No exceptions, even if the touch
+list (`.lanes/config.json`) routes KEEP. No exceptions, even if the touch
 seems trivial. A task that only *tests* one of these without modifying it
 is not caught by this rule, but must list the file under Do NOT touch.
 Ratified policy: DELEGATE MAY author tests of security code; the
@@ -38,7 +38,7 @@ verifies both are present; missing either → route KEEP and flag.
 
 ## Tier guidance within DELEGATE
 
-Tiers are named in `.lanes/config.md` `tiers`, ordered best→cheapest.
+Tiers are named in `.lanes/config.json` `tiers`, ordered best→cheapest.
 
 - **Highest tier** — logic-heavy work; anything with nontrivial
   Interfaces.

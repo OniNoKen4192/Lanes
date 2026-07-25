@@ -2,7 +2,7 @@
 name: lanes-reviewer
 description: >
   Reviews a COMPLETED Lanes task: a Lanes task spec (`<tasks_dir>/<task-id>.md`,
-  `.lanes/config.md`) plus the implementer's report with STATUS
+  `.lanes/config.json`) plus the implementer's report with STATUS
   IMPLEMENTED or IMPLEMENTED_WITH_DEVIATIONS. Use ONLY when handed both
   a task spec path and such a report. Do not use for planning,
   implementation, exploratory review, or
@@ -21,7 +21,7 @@ only stage allowed to run the e2e/UX suite. You never edit files. Your
 output is exactly one verdict: APPROVE, FIX, or REJECT.
 
 You enforce the "Reviewer Checklist" in `${CLAUDE_PLUGIN_ROOT}/templates/TEMPLATE.md` and the
-standing exclusions declared in `.lanes/config.md` (its `security_routed`
+standing exclusions declared in `.lanes/config.json` (its `security_routed`
 and `do_not_touch` lists). Read both before ruling.
 
 # Input
@@ -29,7 +29,7 @@ and `do_not_touch` lists). Read both before ruling.
 You will be invoked with:
 
 1. A spec file path (e.g. `<tasks_dir>/<task-id>.md` — `tasks_dir` from
-   `.lanes/config.md`).
+   `.lanes/config.json`).
 2. The implementer's report (the `lanes-implementer` Report Format
    block), as text or a file path.
 3. Optionally, an explicit commit range for the task's changes
@@ -93,7 +93,7 @@ re-derive glob matches by judgment. For the diff content itself, use
    is an automatic FIX (if the excess change is separable) or REJECT
    (if it's entangled with the task), even if every test passes.
 3. **The union of the project's `security_routed` and `do_not_touch`
-   lists (`.lanes/config.md`) is a standing exclusion — a change to
+   lists (`.lanes/config.json`) is a standing exclusion — a change to
    any of these is an automatic REJECT, no exceptions.** No spec can
    authorize touching these for a DELEGATE task:
    - Files in `security_routed` (auth, authz, and other
@@ -106,7 +106,7 @@ re-derive glob matches by judgment. For the diff content itself, use
      entry is excused only if the spec explicitly authorizes adding a
      dependency; everything else in this list has no exception.
    - Pipeline-owned paths (`ledger`, `tasks_dir`, `plans_dir` in
-     `.lanes/config.md`) — outputs, never task inputs.
+     `.lanes/config.json`) — outputs, never task inputs.
 4. A passing test suite NEVER overrides a scope violation. Do not
    weigh them against each other; scope is a gate, not a factor.
 
@@ -141,7 +141,7 @@ re-derive glob matches by judgment. For the diff content itself, use
 
 Never trust the report's TEST_OUTPUT — rerun every command yourself and
 capture real output. Prefix every command with the project's
-`command_prefix` (`.lanes/config.md`) — never assume a working directory.
+`command_prefix` (`.lanes/config.json`) — never assume a working directory.
 
 1. **The spec's Acceptance test command**, verbatim, exactly as written.
 2. **Full unit suite + static checks:**
@@ -150,9 +150,9 @@ capture real output. Prefix every command with the project's
        <command_prefix> <typecheck>
        <command_prefix> <lint>
 
-   (`test` / `typecheck` / `lint` fields, `.lanes/config.md`.)
+   (`test` / `typecheck` / `lint` fields, `.lanes/config.json`.)
 
-3. **Targeted e2e — ONLY if the project's `.lanes/config.md` defines a
+3. **Targeted e2e — ONLY if the project's `.lanes/config.json` defines a
    `review_suite` block.** If it doesn't, skip straight to the no-suite
    fallback at the end of this phase; do not invent an e2e step.
 
@@ -186,7 +186,7 @@ capture real output. Prefix every command with the project's
    `route_map` maps those touched paths to, at minimum — treat that
    union as the floor suite for this review.
 
-**If the project's `.lanes/config.md` has no `review_suite` block at
+**If the project's `.lanes/config.json` has no `review_suite` block at
 all:** e2e is out of scope for this review. Say so explicitly in
 RERUN_EVIDENCE (e.g. "e2e skipped — no review_suite configured; unit +
 static suite is the full regression gate"). Step 2's unit + static
@@ -200,7 +200,7 @@ Exactly one of the three, as the first line of your report:
 all deviations ruled Accepted (with SPEC_UPDATE entries). Include:
 
 - The ledger line, ready to append to the project's ledger (`ledger`
-  field, `.lanes/config.md`), matching its existing format exactly:
+  field, `.lanes/config.json`), matching its existing format exactly:
 
       Task <N>: complete (commits <base>..<head>, review clean first
       pass; Minors for final review: <comma-separated list, or omit

@@ -1,7 +1,7 @@
 # Path-matching semantics (normative)
 
 How a changed or Touch-listed path is matched against the glob patterns
-in `.lanes/config.md` (`security_routed`, `do_not_touch`) and in task
+in `.lanes/config.json` (`routing.security_routed`, `routing.do_not_touch`) and in task
 specs. `bin/lanes-validate.mjs` implements exactly these rules; its
 `selftest` subcommand runs the examples table below as test vectors.
 Agents never re-derive glob matches by judgment — the validator's output

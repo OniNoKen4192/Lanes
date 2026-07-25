@@ -1,6 +1,6 @@
 ---
 name: lanes
-description: Use when planning or executing work in a project set up with Lanes (a `.lanes/config.md` exists) — assigns KEEP/DELEGATE lanes during planning and routes the emit→implement→review pipeline.
+description: Use when planning or executing work in a project set up with Lanes (a `.lanes/config.json` exists) — assigns KEEP/DELEGATE lanes during planning and routes the emit→implement→review pipeline.
 ---
 
 # Lanes — cross-model task routing
@@ -32,7 +32,7 @@ Four stages, one direction, KEEP and DELEGATE never mixing mid-task:
 2. **`/lanes-emit <plan>`** (compiler stage). Reads the approved plan,
    re-validates every task's lane against `ROUTING.md` (the plan proposes,
    ROUTING.md decides), and emits one spec file per DELEGATE-routed task into
-   the project's `tasks_dir` (`.lanes/config.md`). KEEP-routed tasks get NO
+   the project's `tasks_dir` (`.lanes/config.json`). KEEP-routed tasks get NO
    spec file — nothing about them changes.
 3. **`lanes-implementer`** (dispatch-and-verify agent, one invocation per
    spec). Validates the spec, hands it verbatim to the project's configured
@@ -108,10 +108,10 @@ Before any of the above applies to a project, all three must hold:
 
 - **superpowers is installed** — Lanes hooks its `writing-plans` skill; it
   does not stand alone.
-- **`.lanes/config.md` exists** in the project. If it doesn't, run
+- **`.lanes/config.json` exists** in the project. If it doesn't, run
   `/lanes-init` first — it inspects the repo and drafts the config (tier
   names, `plans_dir`, `tasks_dir`, security-routed files, and the rest);
   Lanes refuses to route against a project it hasn't been configured for.
-- **A DELEGATE backend is configured** (`.lanes/config.md` `backend` and its
+- **A DELEGATE backend is configured** (`.lanes/config.json` `backend` and its
   dispatch/reply tools) — without one, every task should stay KEEP, since
   there is nowhere for a DELEGATE-routed task to go.

@@ -1,7 +1,7 @@
 # TEMPLATE.md — Per-task spec contract (DELEGATE lane)
 
 Lives at `templates/TEMPLATE.md` in the Lanes plugin. Emitted task specs go
-in the project's `tasks_dir` (`.lanes/config.md`; default
+in the project's `tasks_dir` (`.lanes/config.json`; default
 `docs/superpowers/tasks/<task-id>.md`). (Not to be confused with design
 specs — those describe features; these are per-task implementation
 contracts derived from the project's plans, in `plans_dir`.)
@@ -14,7 +14,7 @@ because its absence causes a specific, observed failure mode in
 cross-model handoffs.
 
 **Repo-wide rule for every command in every spec:** prefix every command
-with the project's `command_prefix` (`.lanes/config.md`); never emit a
+with the project's `command_prefix` (`.lanes/config.json`); never emit a
 bare command that assumes a working directory. The implementer and the
 delegate backend make no guarantees about their working directory.
 
@@ -46,7 +46,7 @@ task must not relitigate. 3–8 sentences. Do not paste the whole plan.>
 
 ### Touch
 <All paths relative to repo root, including the project's `app_subdir`
-(`.lanes/config.md`) if it has one.>
+(`.lanes/config.json`) if it has one.>
 | Path | Action | Notes |
 |------|--------|-------|
 | `<app_subdir>/src/lib/example.ts` | modify | add X to Y |
@@ -63,7 +63,7 @@ sharing a module, config, or naming convention with the Touch list.>
 **Standing exclusions (apply to every task; also in the project's
 AGENTS.md — repeat the relevant ones here anyway, repetition is cheap and
 drift is not):** the entries in the project's `do_not_touch` and
-`security_routed` lists (`.lanes/config.md`), repeated here at emission
+`security_routed` lists (`.lanes/config.json`), repeated here at emission
 time. Categories typically include:
 - Migration files — append-only via the project's migration tool, and
   schema changes are never dispatched to the DELEGATE lane
@@ -71,7 +71,7 @@ time. Categories typically include:
   visibility/permission gates) — tasks touching these are routed to a KEEP
   implementer by the planner, never to DELEGATE
 - Pipeline-owned build ledger and review artifacts (`ledger`, `tasks_dir`,
-  `plans_dir` in `.lanes/config.md`) — outputs, never task inputs
+  `plans_dir` in `.lanes/config.json`) — outputs, never task inputs
 - Pinned UI components — never regenerate or "update"
 - Lockfile — unless the spec explicitly adds a dependency
 
@@ -120,7 +120,7 @@ without a runnable test command.>
 3. <...>
 
 **Affected workflow IDs**: <IDs from the project's `review_suite.id_index`
-(`.lanes/config.md`), or "none">
+(`.lanes/config.json`), or "none">
 <The reviewer runs the matching e2e/workflow specs. Listing them here is
 what makes that check mechanical instead of judgment.>
 
@@ -128,7 +128,7 @@ what makes that check mechanical instead of judgment.>
 ```bash
 <command_prefix> <test>
 ```
-<Unit test runner only (`test` in `.lanes/config.md`). The project's
+<Unit test runner only (`test` in `.lanes/config.json`). The project's
 e2e/UX suite, if configured (`review_suite`), is the reviewer-level guard
 — do not put e2e commands in task specs; DELEGATE tasks must not spin up
 the e2e environment.>
@@ -170,11 +170,11 @@ BLOCKED_REASON: <only if BLOCKED: what was needed that the spec didn't provide>
 5. **Context is for decisions, not narration.** Every sentence in Context
    should prevent a specific wrong choice. If it doesn't, cut it.
 6. **Emit the spec as a file** at the project's `tasks_dir`
-   (`.lanes/config.md`; default `docs/superpowers/tasks/<task-id>.md`), not
+   (`.lanes/config.json`; default `docs/superpowers/tasks/<task-id>.md`), not
    just as prose in the session — the dispatcher passes the file, the reviewer
    diffs the result against it, and you get an audit trail for free.
 7. **Security routing.** Any task whose Touch list includes an entry in the
-   project's `security_routed` list (`.lanes/config.md`) is routed to a KEEP
+   project's `security_routed` list (`.lanes/config.json`) is routed to a KEEP
    implementer, never to DELEGATE. Mark it `Model hint: keep` in Meta.
 8. **Specs carry contracts, not implementations.** No full-file code
    blocks. Interfaces, constraints, and behavioral criteria define the

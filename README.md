@@ -38,12 +38,18 @@ contract.
 
 Run `/lanes-init` once, from the root of the project you want Lanes to
 operate on. It inspects your package manifest, verification commands, and
-source tree, then drafts `.lanes/config.md` — the one per-project file
+source tree, then drafts `.lanes/config.json` — the one per-project file
 every Lanes command and agent reads. It refuses to run below a documented
 readiness floor: your project needs a real package manifest, at least one
 runnable verification command, and a non-trivial source tree (manifest +
 README alone isn't enough) — if you're still at that stage, build the
 walking skeleton with superpowers first, then come back.
+
+After init — or any time — run `/lanes-doctor`: it validates the config
+against its schema, previews what your security globs actually match,
+resolves your verification commands against the manifest, and reports
+whether the repo and backend are safe to operate on. It is also the
+migration path if your project still has a legacy Markdown config.
 
 ## Use it
 
@@ -92,7 +98,7 @@ is not a backend framework. Every Codex-specific fact (tool names,
 dispatch/reply calls) is isolated to the block marked
 `<!-- BEGIN BACKEND SEAM -->` / `<!-- END BACKEND SEAM -->` in
 [`agents/lanes-implementer.md`](agents/lanes-implementer.md), plus four
-fields in `.lanes/config.md` (`dispatch_tool`, `reply_tool`,
+fields in `.lanes/config.json` (`dispatch_tool`, `reply_tool`,
 `approval_mode`, `ratelimit_signal`) and that agent's `tools:` frontmatter
 line. A second backend is a config change plus a rewrite of that one
 block — not a rewrite of the plugin.

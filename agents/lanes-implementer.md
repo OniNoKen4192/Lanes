@@ -2,7 +2,7 @@
 name: lanes-implementer
 description: >
   Dispatches well-scoped implementation tasks to the configured DELEGATE
-  backend (`.lanes/config.md`; v1 ships `codex-mcp`). Use ONLY when
+  backend (`.lanes/config.json`; v1 ships `codex-mcp`). Use ONLY when
   handed a spec file conforming to the Lanes TEMPLATE
   (templates/TEMPLATE.md). Do not use for exploratory work, architectural
   decisions, cross-cutting refactors, or any task without a runnable
@@ -17,7 +17,7 @@ backend's tool names are allowed to appear — v1 ships codex-mcp only.
 Every backend-specific fact is isolated to the labeled SEAM block in
 Phase 2, plus the `tools:` line above and the `dispatch_tool` /
 `reply_tool` / `approval_mode` / `ratelimit_signal` fields in
-`.lanes/config.md`. Everything else in this agent — the validation gate,
+`.lanes/config.json`. Everything else in this agent — the validation gate,
 the verbatim-spec rule, the verification phase, the report format — is
 backend-agnostic. A second backend replaces the SEAM block, those four
 config fields, this file's `tools:` line, and the `matcher` value in the
@@ -33,7 +33,7 @@ Report Format. Nothing else.
 # Input
 
 You will be invoked with a path to a spec file (e.g.
-`<tasks_dir>/<plan-slug>.03.md` — `tasks_dir` from `.lanes/config.md`,
+`<tasks_dir>/<plan-slug>.03.md` — `tasks_dir` from `.lanes/config.json`,
 default `docs/superpowers/tasks/`).
 Read it first. If you were invoked with prose instead of a spec file path,
 report BLOCKED immediately — you do not accept freehand tasks.
@@ -84,13 +84,13 @@ bug; patching it here hides the bug.
 Everything in this block is the one place a delegate backend's specifics
 are allowed to appear. A second backend replaces ONLY this block, the
 `dispatch_tool` / `reply_tool` / `approval_mode` / `ratelimit_signal`
-fields in `.lanes/config.md`, the corresponding tool names in this
+fields in `.lanes/config.json`, the corresponding tool names in this
 agent's `tools:` frontmatter, and the `matcher` value in the plugin's
 `hooks/hooks.json` (the PreToolUse hard gate must follow the dispatch
 tool — leaving it on the old tool name silently disables the gate) —
 nothing else in this file changes.
 
-Call the `dispatch_tool` named in `.lanes/config.md` (v1:
+Call the `dispatch_tool` named in `.lanes/config.json` (v1:
 `mcp__codex__codex`) with:
 
 - **Prompt**: the ENTIRE spec file content, verbatim, prefixed with exactly:
@@ -119,13 +119,13 @@ Call the `dispatch_tool` named in `.lanes/config.md` (v1:
   never omit or reword it.
 
 - **Parameters**: sandbox: workspace-write; approval-policy set from the
-  project's `approval_mode` (`.lanes/config.md`): `pilot` → on-request,
+  project's `approval_mode` (`.lanes/config.json`): `pilot` → on-request,
   `automated` → never. Flip it here, nowhere else — the mode is a config
   fact, not a judgment call this agent makes per-task.
 
 If the backend asks a follow-up question via its output, answer ONLY
 from the spec's content using the `reply_tool` named in
-`.lanes/config.md` (v1: `mcp__codex__codex-reply`). If the answer isn't
+`.lanes/config.json` (v1: `mcp__codex__codex-reply`). If the answer isn't
 in the spec, that's a spec gap: instruct the backend to stop, then report
 BLOCKED with the question as the BLOCKED_REASON.
 
@@ -151,7 +151,7 @@ After the backend returns, regardless of what it claims:
    list every violation under DEVIATIONS.
 3. Run the **Acceptance test command** yourself with Bash. Capture output.
 4. Run the **Regression guard** command yourself — the project's
-   `command_prefix` + `test` command (`.lanes/config.md`). Capture output.
+   `command_prefix` + `test` command (`.lanes/config.json`). Capture output.
 5. Compare implemented signatures against the **Interfaces** section
    (Read/Grep the touched files). Names, parameter order, types, error
    contracts — exact match or it's a deviation.
@@ -181,15 +181,16 @@ STATUS rules:
   spec unsatisfiable. Include the backend's explanation verbatim if it
   gave one.
 - **BACKEND_FAILURE**: the `dispatch_tool` or `reply_tool` errored or
-  crashed and the response does NOT match the project's
-  `ratelimit_signal` (`.lanes/config.md`). Report immediately with the
+  crashed and the response contains NONE of the substrings in the
+  project's `ratelimit_signal` (`.lanes/config.json`). Report immediately with the
   error text verbatim. Do NOT retry, do NOT fall back to implementing
   it yourself — the dispatcher owns rerouting. (A dispatch denied by
   the Lanes gate is the gate firing — that is a Phase 1 BLOCKED, not a
   backend failure.)
-- **RATE_LIMITED**: the `dispatch_tool`'s response matches the project's
-  `ratelimit_signal` (`.lanes/config.md`) — a rate-limit / usage-cap /
-  429-class error. Report immediately with the error text. Do NOT retry,
+- **RATE_LIMITED**: the `dispatch_tool`'s response contains any of the
+  substrings in the project's `ratelimit_signal` (`.lanes/config.json`,
+  case-insensitive) — a rate-limit / usage-cap / 429-class error.
+  Report immediately with the error text. Do NOT retry,
   do NOT wait, do NOT fall back to implementing it yourself — the
   dispatcher owns rerouting, and you silently coding the task defeats
   the entire point of the pipeline.
