@@ -142,10 +142,10 @@ function validateConfig(cfg) {
   return errors;
 }
 
-function loadConfig() {
-  const p = ".lanes/config.json";
+function loadConfig(rootDir = ".") {
+  const p = path.join(rootDir, ".lanes", "config.json");
   if (!fs.existsSync(p)) {
-    throw new Error(fs.existsSync(".lanes/config.md")
+    throw new Error(fs.existsSync(path.join(rootDir, ".lanes", "config.md"))
       ? ".lanes/config.json not found, but a legacy .lanes/config.md exists — run /lanes-doctor to migrate it"
       : ".lanes/config.json not found — run /lanes-init first");
   }
@@ -427,7 +427,7 @@ function runGate(specPathArg) {
   const rootReal = normalizePath(fs.realpathSync(root)).toLowerCase();
 
   let config;
-  try { config = loadConfig(); } catch (err) { gateFail("config", String(err.message || err)); }
+  try { config = loadConfig(mainRepoRoot()); } catch (err) { gateFail("config", String(err.message || err)); }
 
   const specPath = normalizePath(specPathArg);
   if (!fs.existsSync(specPath)) gateFail("spec", `spec file not found: ${specPath}`);
@@ -506,7 +506,7 @@ function runAudit(taskIdArg) {
   if (!taskIdArg) { console.error("audit: --task <id> required"); process.exit(1); }
   const root = git("rev-parse", "--show-toplevel");
   process.chdir(root);
-  const config = loadConfig();
+  const config = loadConfig(mainRepoRoot());
 
   const statePath = path.join(mainRepoRoot(), ".lanes", "state", `${taskIdArg.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
   if (!fs.existsSync(statePath)) {
@@ -757,19 +757,21 @@ function runWorktreeCreate(specPathArg) {
   ensureExcluded(root);
   const base_sha = git("rev-parse", "HEAD");
   git("worktree", "add", wtPath, "-b", branch, "HEAD");
-  // Anything dispatch needs that is uncommitted in the main tree is
-  // missing from the fresh checkout — copy it in (spec + config only;
-  // both are on the gate's baseline allowlist).
-  const wtSpec = path.join(wtPath, specPath);
-  if (!fs.existsSync(wtSpec)) {
-    fs.mkdirSync(path.dirname(wtSpec), { recursive: true });
-    fs.copyFileSync(specPath, wtSpec);
-  }
-  const wtConfig = path.join(wtPath, ".lanes", "config.json");
-  if (!fs.existsSync(wtConfig)) {
-    fs.mkdirSync(path.dirname(wtConfig), { recursive: true });
-    fs.copyFileSync(path.join(".lanes", "config.json"), wtConfig);
-  }
+  // Snapshot dispatch inputs from the MAIN working tree into the
+  // worktree, overwriting the checkout's committed versions when they
+  // differ — the operator's current spec/config always win over stale
+  // committed copies. Both paths are baseline-allowlisted. (The gate and
+  // audit read config from the main tree regardless; the worktree copy
+  // is a convenience snapshot for prose readers.)
+  const syncIn = (srcRel, destAbs) => {
+    fs.mkdirSync(path.dirname(destAbs), { recursive: true });
+    if (!fs.existsSync(destAbs)
+        || !fs.readFileSync(srcRel).equals(fs.readFileSync(destAbs))) {
+      fs.copyFileSync(srcRel, destAbs);
+    }
+  };
+  syncIn(specPath, path.join(wtPath, specPath));
+  syncIn(path.join(".lanes", "config.json"), path.join(wtPath, ".lanes", "config.json"));
   console.log(JSON.stringify({ ok: true, task: spec.taskId, path: wtPath, branch, base_sha }));
 }
 
@@ -780,7 +782,25 @@ function runWorktreeRemove(taskIdArg, force) {
   const taskFile = taskIdArg.replace(/[^A-Za-z0-9._-]/g, "_");
   const wtPath = `.lanes/worktrees/${taskFile}`;
   const branch = `lanes/${taskFile}`;
-  if (!fs.existsSync(wtPath)) wtFail(`no worktree at ${wtPath}`);
+  if (!fs.existsSync(wtPath)) {
+    // Directory manually deleted? If git still registers it, prune the
+    // stale registration and fall through to branch cleanup; a task that
+    // never had a worktree (no registration, no branch) is a refusal.
+    const registered = git("worktree", "list", "--porcelain")
+      .split(/\r?\n/)
+      .filter((l) => l.startsWith("worktree "))
+      .map((l) => normalizePath(l.slice("worktree ".length)).toLowerCase())
+      .includes(normalizePath(path.resolve(wtPath)).toLowerCase());
+    const branchExists = git("branch", "--list", branch).trim() !== "";
+    if (!registered && !branchExists) wtFail(`no worktree at ${wtPath}`);
+    if (registered) git("worktree", "prune");
+    let branchRemoved = !branchExists;
+    if (branchExists) {
+      try { git("branch", "-d", branch); branchRemoved = true; } catch { branchRemoved = false; }
+    }
+    console.log(JSON.stringify({ ok: true, task: taskIdArg, removed: wtPath, pruned: registered, branch, branch_removed: branchRemoved }));
+    return;
+  }
   try {
     git("worktree", "remove", ...(force ? ["--force"] : []), wtPath);
   } catch (err) {

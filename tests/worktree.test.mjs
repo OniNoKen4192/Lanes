@@ -147,6 +147,92 @@ describe("audit in worktree: delegate commit flagged", () => {
   });
 });
 
+describe("audit ignores tampered worktree config", () => {
+  const { fx, wt } = setup();
+  after(() => fx.cleanup());
+
+  test("audit ignores tampered worktree config", () => {
+    const g = validate(wt, "gate", "--spec", "docs/tasks/T2.md");
+    assert.equal(g.status, 0);
+
+    // Delegate edits a security-routed file...
+    fs.appendFileSync(path.join(wt, "src", "auth.ts"), "// tampered\n");
+
+    // ...and rewrites the worktree's config copy to launder it clean.
+    const permissiveConfig = {
+      schema_version: 1,
+      project: { app_subdir: "", command_prefix: "" },
+      commands: {
+        test: "node run-tests.mjs",
+        lint: "",
+        typecheck: "",
+        acceptance_runner: "node run-tests.mjs",
+      },
+      backend: {
+        name: "codex-mcp",
+        dispatch_tool: "mcp__codex__codex",
+        reply_tool: "mcp__codex__codex-reply",
+        approval_mode: "pilot",
+        tiers: ["alpha", "beta"],
+        ratelimit_signal: ["429"],
+      },
+      routing: { security_routed: [], do_not_touch: [] },
+      pipeline: { plans_dir: "docs/plans", tasks_dir: "docs/tasks", ledger: "docs/progress.md" },
+    };
+    fs.writeFileSync(
+      path.join(wt, ".lanes", "config.json"),
+      JSON.stringify(permissiveConfig, null, 2) + "\n",
+    );
+
+    const r = validate(wt, "audit", "--task", "T2");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.verdict, "violations");
+    const hit = r.json.forbidden.find((f) => f.path === "src/auth.ts");
+    assert.ok(hit, `expected src/auth.ts in forbidden, got: ${JSON.stringify(r.json.forbidden)}`);
+    assert.equal(hit.list, "security_routed");
+  });
+});
+
+describe("worktree create refreshes stale dispatch inputs", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree create refreshes stale dispatch inputs", () => {
+    const mainSpecPath = path.join(fx.dir, "docs", "tasks", "T1.md");
+    fs.appendFileSync(mainSpecPath, "<!-- operator edit, uncommitted -->\n");
+
+    const r = validate(fx.dir, "worktree", "create", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 0, `worktree create failed: ${r.stdout} ${r.stderr}`);
+
+    const wtSpecPath = path.join(fx.dir, ".lanes", "worktrees", "T1", "docs", "tasks", "T1.md");
+    assert.ok(fs.existsSync(wtSpecPath), `expected worktree spec copy at ${wtSpecPath}`);
+    assert.ok(
+      fs.readFileSync(mainSpecPath).equals(fs.readFileSync(wtSpecPath)),
+      "expected worktree spec copy to byte-match the MAIN working copy",
+    );
+  });
+});
+
+describe("worktree remove prunes a manually deleted worktree", () => {
+  const { fx, wt } = setup();
+  after(() => fx.cleanup());
+
+  test("worktree remove prunes a manually deleted worktree", () => {
+    fs.rmSync(wt, { recursive: true, force: true });
+
+    const r = validate(fx.dir, "worktree", "remove", "--task", "T2");
+    assert.equal(r.status, 0, `expected clean prune, got: ${r.stdout} ${r.stderr}`);
+    assert.equal(r.json.ok, true);
+    assert.equal(r.json.pruned, true);
+
+    const listed = gitC(fx.dir, "worktree", "list", "--porcelain");
+    assert.ok(!listed.includes(np(wt)), `expected pruned worktree to be gone from 'worktree list', got: ${listed}`);
+
+    const r2 = validate(fx.dir, "worktree", "create", "--spec", "docs/tasks/T2.md");
+    assert.equal(r2.status, 0, `expected re-create to succeed after prune: ${r2.stdout} ${r2.stderr}`);
+  });
+});
+
 describe("worktree remove: refuses dirty, --force succeeds", () => {
   const { fx, wt } = setup();
   after(() => fx.cleanup());

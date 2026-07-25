@@ -46,8 +46,10 @@ worktree is the working root for EVERYTHING: the Phase 1 gate, the
 acceptance red-check, the dispatch, and every Phase 3 verification
 command run from inside it, and the spec path is worktree-relative. The
 baseline record still lands in the main repo's `.lanes/state/` — the
-validator handles that placement itself; never write there. Without a
-worktree path, work at the session root exactly as described below.
+validator handles that placement itself; never write there. The same
+goes for config reads: take `.lanes/config.json` from the MAIN repo,
+not the worktree's snapshot copy. Without a worktree path, work at the
+session root exactly as described below.
 
 # Phase 1 — Validation Gate (before any backend call)
 

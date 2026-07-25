@@ -45,7 +45,9 @@ You will be invoked with:
    implementer produced). Every command you run — the audit, diffs, the
    acceptance rerun, unit/static suites, e2e — runs from inside it. The
    baseline record is found automatically; it lives in the main repo's
-   `.lanes/state/`.
+   `.lanes/state/`. Read the project config the same way — the MAIN
+   repo's `.lanes/config.json` is authoritative; the worktree's copy is a
+   convenience snapshot a delegate could have tampered with.
 
 If the spec or the report is missing, refuse (VERDICT: REJECT with one
 sentence saying which input is missing — that's a dispatcher error, not

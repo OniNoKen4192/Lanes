@@ -51,7 +51,10 @@ New helper `mainRepoRoot()` = `path.resolve(git rev-parse
 `<mainRepoRoot>/.lanes/state/<task>.json` instead of
 toplevel-relative paths. In a normal repo the two roots coincide —
 existing behavior unchanged; inside a linked worktree, state lands in
-the main tree, outside the delegate's writable sandbox.
+the main tree, outside the delegate's writable sandbox. The gate and
+audit also load `.lanes/config.json` from the main root — enforcement
+inputs (config AND state) never come from the delegate-writable
+worktree.
 
 ## 3. Validator: `worktree create --spec <path>`
 
@@ -65,10 +68,10 @@ fail-closed at each:
    exists (no clobber; the error names `worktree remove`).
 4. Ensure `.git/info/exclude` contains a `.lanes/worktrees/` line.
 5. `git worktree add .lanes/worktrees/<task> -b lanes/<task> HEAD`.
-6. Copy into the worktree anything dispatch needs that is uncommitted in
-   the main tree: the spec file (at the same relative path) and
-   `.lanes/config.json`, each only when absent from the checkout. Both
-   land on the gate's baseline allowlist.
+6. Copy into the worktree the CURRENT main-tree spec and
+   `.lanes/config.json`, overwriting the checkout's committed versions
+   when they differ — the operator's working copies win; the worktree
+   copies are convenience snapshots, never enforcement inputs.
 7. Print `{ ok: true, task, path, branch, base_sha }` (base_sha = HEAD
    at creation = the worktree's initial HEAD).
 
