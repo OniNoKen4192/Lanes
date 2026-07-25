@@ -841,13 +841,15 @@ function ensureExcluded(root) {
 // Snapshot dispatch inputs from the MAIN working tree into a worktree,
 // overwriting the checkout's committed versions when they differ — the
 // operator's current spec/config always win over stale committed
-// copies. (The gate and audit read config from the main tree
-// regardless; the worktree copy is a convenience snapshot for prose
-// readers.)
+// copies. Line-ending-only differences are NOT staleness: an autocrlf
+// checkout legitimately differs from the main tree by CRLF, and copying
+// over it would dirty the worktree and block its clean removal. (The
+// gate and audit read config from the main tree regardless; the
+// worktree copy is a convenience snapshot for prose readers.)
 function syncIn(srcRel, destAbs) {
   fs.mkdirSync(path.dirname(destAbs), { recursive: true });
-  if (!fs.existsSync(destAbs)
-      || !fs.readFileSync(srcRel).equals(fs.readFileSync(destAbs))) {
+  const eol = (p) => fs.readFileSync(p, "utf8").replaceAll("\r\n", "\n");
+  if (!fs.existsSync(destAbs) || eol(srcRel) !== eol(destAbs)) {
     fs.copyFileSync(srcRel, destAbs);
   }
 }
