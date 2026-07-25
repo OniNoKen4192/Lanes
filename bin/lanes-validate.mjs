@@ -368,6 +368,14 @@ function sha256(buf) {
   return createHash("sha256").update(buf).digest("hex");
 }
 
+// The repo root that owns .lanes/state: in a linked worktree, the MAIN
+// working tree's root; in a normal repo, the toplevel itself. Baseline
+// records must live outside the delegate's writable sandbox (design
+// spec 2026-07-25-worktree-isolation §2).
+function mainRepoRoot() {
+  return path.resolve(git("rev-parse", "--git-common-dir"), "..");
+}
+
 // One `git status --porcelain` line → the path(s) it names.
 // Renames arrive as "R  old -> new"; quoted paths lose their quotes.
 function statusPaths(line) {
@@ -485,8 +493,9 @@ function runGate(specPathArg) {
     base_sha: git("rev-parse", "HEAD"),
     dispatched_at: new Date().toISOString(),
   };
-  fs.mkdirSync(".lanes/state", { recursive: true });
-  const statePath = `.lanes/state/${taskFile}.json`;
+  const stateDir = path.join(mainRepoRoot(), ".lanes", "state");
+  fs.mkdirSync(stateDir, { recursive: true });
+  const statePath = path.join(stateDir, `${taskFile}.json`);
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + "\n");
   console.log(JSON.stringify({ ok: true, task: spec.taskId, base_sha: state.base_sha, state_path: statePath }));
 }
@@ -499,7 +508,7 @@ function runAudit(taskIdArg) {
   process.chdir(root);
   const config = loadConfig();
 
-  const statePath = `.lanes/state/${taskIdArg.replace(/[^A-Za-z0-9._-]/g, "_")}.json`;
+  const statePath = path.join(mainRepoRoot(), ".lanes", "state", `${taskIdArg.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
   if (!fs.existsSync(statePath)) {
     console.log(JSON.stringify({ task: taskIdArg, verdict: "violations",
       error: `no baseline state at ${statePath} — was this task dispatched through the gate?` }));
@@ -702,6 +711,89 @@ function runDoctor() {
   process.exit(failed ? 2 : 0);
 }
 
+// ---------------------------------------------------------------- worktree
+
+// Controller-owned per-task isolation (design spec
+// 2026-07-25-worktree-isolation §3-§4). Fixed conventions: worktree at
+// .lanes/worktrees/<task>, branch lanes/<task>, ignored via
+// .git/info/exclude (repo-local — never a tracked-file edit).
+
+function wtFail(reason, details = {}) {
+  console.log(JSON.stringify({ ok: false, check: "worktree", reason, ...details }));
+  process.exit(2);
+}
+
+function ensureExcluded(root) {
+  const excl = path.join(root, ".git", "info", "exclude");
+  let text = "";
+  try { text = fs.readFileSync(excl, "utf8"); } catch {}
+  if (!text.split(/\r?\n/).includes(".lanes/worktrees/")) {
+    fs.mkdirSync(path.dirname(excl), { recursive: true });
+    fs.writeFileSync(excl, text + (text === "" || text.endsWith("\n") ? "" : "\n") + ".lanes/worktrees/\n");
+  }
+}
+
+function runWorktreeCreate(specPathArg) {
+  if (!specPathArg) { console.error("worktree create: --spec <path> required"); process.exit(1); }
+  const root = git("rev-parse", "--show-toplevel");
+  process.chdir(root);
+  if (path.resolve(mainRepoRoot()) !== path.resolve(root)) {
+    wtFail("worktree create must run from the main working tree, not a linked worktree");
+  }
+  try { loadConfig(); } catch (err) { wtFail(String(err.message || err)); }
+  const specPath = normalizePath(specPathArg);
+  if (!fs.existsSync(specPath)) wtFail(`spec file not found: ${specPath}`);
+  const spec = parseSpec(fs.readFileSync(specPath, "utf8"));
+  if (!spec.taskId) wtFail("spec has no '**Task ID**:' entry in Meta");
+  const taskFile = spec.taskId.replace(/[^A-Za-z0-9._-]/g, "_");
+  const branch = `lanes/${taskFile}`;
+  const wtPath = `.lanes/worktrees/${taskFile}`;
+  if (fs.existsSync(wtPath)) {
+    wtFail(`worktree already exists: ${wtPath} — run 'worktree remove --task ${spec.taskId}' first`);
+  }
+  if (git("branch", "--list", branch).trim()) {
+    wtFail(`branch already exists: ${branch} — integrate or delete it first`);
+  }
+  ensureExcluded(root);
+  const base_sha = git("rev-parse", "HEAD");
+  git("worktree", "add", wtPath, "-b", branch, "HEAD");
+  // Anything dispatch needs that is uncommitted in the main tree is
+  // missing from the fresh checkout — copy it in (spec + config only;
+  // both are on the gate's baseline allowlist).
+  const wtSpec = path.join(wtPath, specPath);
+  if (!fs.existsSync(wtSpec)) {
+    fs.mkdirSync(path.dirname(wtSpec), { recursive: true });
+    fs.copyFileSync(specPath, wtSpec);
+  }
+  const wtConfig = path.join(wtPath, ".lanes", "config.json");
+  if (!fs.existsSync(wtConfig)) {
+    fs.mkdirSync(path.dirname(wtConfig), { recursive: true });
+    fs.copyFileSync(path.join(".lanes", "config.json"), wtConfig);
+  }
+  console.log(JSON.stringify({ ok: true, task: spec.taskId, path: wtPath, branch, base_sha }));
+}
+
+function runWorktreeRemove(taskIdArg, force) {
+  if (!taskIdArg) { console.error("worktree remove: --task <id> required"); process.exit(1); }
+  const root = git("rev-parse", "--show-toplevel");
+  process.chdir(root);
+  const taskFile = taskIdArg.replace(/[^A-Za-z0-9._-]/g, "_");
+  const wtPath = `.lanes/worktrees/${taskFile}`;
+  const branch = `lanes/${taskFile}`;
+  if (!fs.existsSync(wtPath)) wtFail(`no worktree at ${wtPath}`);
+  try {
+    git("worktree", "remove", ...(force ? ["--force"] : []), wtPath);
+  } catch (err) {
+    wtFail(
+      `git worktree remove refused (uncommitted changes? use --force to discard): ${String(err.stderr || err.message || err).trim()}`,
+      { path: wtPath },
+    );
+  }
+  let branchRemoved = true;
+  try { git("branch", "-d", branch); } catch { branchRemoved = false; } // unmerged — kept deliberately
+  console.log(JSON.stringify({ ok: true, task: taskIdArg, removed: wtPath, branch, branch_removed: branchRemoved }));
+}
+
 // ---------------------------------------------------------------- CLI
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -715,8 +807,10 @@ try {
   else if (cmd === "gate") runGate(argOf("--spec"));
   else if (cmd === "audit") runAudit(argOf("--task"));
   else if (cmd === "doctor") runDoctor();
+  else if (cmd === "worktree" && rest[0] === "create") runWorktreeCreate(argOf("--spec"));
+  else if (cmd === "worktree" && rest[0] === "remove") runWorktreeRemove(argOf("--task"), rest.includes("--force"));
   else {
-    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | doctor | selftest>");
+    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | doctor | worktree create --spec <path> | worktree remove --task <id> [--force] | selftest>");
     process.exit(1);
   }
 } catch (err) {
