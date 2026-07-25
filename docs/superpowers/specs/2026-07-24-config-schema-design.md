@@ -114,9 +114,10 @@ Every prose surface that names `config.md` is updated to name
 `review_suite`), but reading unambiguous JSON instead of annotated
 Markdown. Surfaces: `agents/lanes-implementer.md`,
 `agents/lanes-reviewer.md`, `commands/lanes-emit.md`,
-`commands/lanes-init.md`, `skills/lanes/SKILL.md`, `README.md`,
-`hooks/` (only if its files name the config path — the hook itself calls
-`gate`, which inherits).
+`commands/lanes-init.md`, `skills/lanes/SKILL.md`,
+`templates/TEMPLATE.md`, `templates/ROUTING.md`, `docs/PATH-MATCHING.md`,
+`README.md`. The `hooks/` scripts never name the config path (verified) —
+the hook calls `gate`, which inherits the new loader.
 
 ## 4. `doctor` subcommand (deterministic checks)
 
