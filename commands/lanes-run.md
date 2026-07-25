@@ -17,10 +17,10 @@ immutable-spec amendments all apply to every dispatch exactly as always.
 
 ## Preconditions (refuse, naming the unmet one)
 
-1. `.lanes/config.json` loads clean and `automation.level` is exactly
-   `"conveyor"`. At `"manual"` or `"verdicts"` refuse — the declared
-   trust level IS the authorization to run unattended; do not offer to
-   proceed anyway.
+1. `.lanes/config.json` loads clean and `automation.level` is
+   `"conveyor"` or `"highways"`. At `"manual"` or `"verdicts"` refuse —
+   the declared trust level IS the authorization to run unattended; do
+   not offer to proceed anyway.
 2. The plan file exists and contains a Task/Lane Map table
    (`task | lane | tier | depends-on`).
 
@@ -32,7 +32,11 @@ immutable-spec amendments all apply to every dispatch exactly as always.
    ROUTING.md, as always).
 2. **Walk the Task/Lane Map in dependency order, serially** — never
    dispatch a task whose dependency has not landed:
-   - **DELEGATE task** → the full existing cycle:
+   - **DELEGATE task** → first
+     `node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" attention --spec <spec-path>`;
+     any matching category parks the task on arrival, category in the
+     reason — attention work never runs unattended. Otherwise the full
+     existing cycle:
      `node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" worktree create --spec <spec-path>`,
      dispatch `lanes-implementer` (spec + worktree path), then
      `lanes-reviewer` (spec + implementer report + the SAME worktree
@@ -56,7 +60,7 @@ immutable-spec amendments all apply to every dispatch exactly as always.
    does not depend on it. Park on: reviewer REJECT, FIX rounds
    exhausted, implementer BLOCKED, implementer BACKEND_FAILURE,
    RATE_LIMITED after tier fallback has exhausted every configured
-   tier, or security-routed arrival. A parked task's worktree stays in
+   tier, security-routed arrival, or attention-category arrival. A parked task's worktree stays in
    place, inspectable — never `worktree remove --force` a parked task.
 4. **Run report.** The run ends when nothing dispatchable remains.
    Report two lists: tasks landed (each with its merge commit) and
@@ -65,8 +69,8 @@ immutable-spec amendments all apply to every dispatch exactly as always.
 
 ## Hard rules
 
-- Security-routed work never runs unattended — parked on arrival,
-  every time.
+- Security-routed and attention-matched work never runs unattended —
+  parked on arrival, every time.
 - REJECT always stops that task for the human. Never re-dispatch past
   a REJECT.
 - Never push to a remote. Merges stay local; publishing is the human's

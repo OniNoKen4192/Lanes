@@ -420,3 +420,54 @@ test("roundabout: config examples document automation", () => {
     assert.ok(md.includes(term), `config.example.md should document ${JSON.stringify(term)}`);
   }
 });
+
+// -------------------------------------------------- Highways (2026-07-25)
+
+test("highways: /lanes-highway command structure", () => {
+  const cmd = read("commands/lanes-highway.md");
+  assert.ok(cmd.startsWith("---\n"), "lanes-highway.md should start with a frontmatter fence");
+  for (const term of [
+    "highways", "stream map", "territory", "depends-on", "lanes-stream-planner",
+    "attention", "highway/integration", "park", "Integration review", "Task/Lane Map",
+    "worktree create --stream",
+  ]) {
+    assert.ok(cmd.includes(term), `lanes-highway.md should mention ${JSON.stringify(term)}`);
+  }
+  assert.ok(!cmd.includes("git push"), "a highway run must never push to a remote");
+  assert.ok(cmd.includes("never committed to, merged into, or checked"),
+    "lanes-highway.md should state the never-touch-working-branch rule");
+});
+
+test("highways: stream planner agent plans only", () => {
+  const agent = read("agents/lanes-stream-planner.md");
+  assert.ok(agent.includes("name: lanes-stream-planner"), "agent frontmatter should carry its name");
+  for (const term of ["territory", "Task/Lane Map", "(LANE: KEEP)", "interfaces"]) {
+    assert.ok(agent.includes(term), `lanes-stream-planner.md should mention ${JSON.stringify(term)}`);
+  }
+  assert.ok(agent.includes("You never execute anything"),
+    "the stream planner must declare itself planning-only");
+});
+
+test("highways: lanes-run accepts both levels and parks attention", () => {
+  const cmd = read("commands/lanes-run.md");
+  assert.ok(cmd.includes('"conveyor"') && cmd.includes('"highways"'),
+    "lanes-run.md precondition should name both accepted levels");
+  assert.ok(cmd.includes("attention --spec"), "lanes-run.md should call the attention subcommand");
+});
+
+test("highways: SKILL.md references /lanes-highway", () => {
+  const skill = read("skills/lanes/SKILL.md");
+  assert.ok(skill.includes("/lanes-highway"), "SKILL.md should reference /lanes-highway");
+  assert.ok(skill.includes("routing.attention"), "SKILL.md should reference routing.attention");
+});
+
+test("highways: config templates document attention and the fourth rung", () => {
+  const json = JSON.parse(read("templates/config.example.json"));
+  assert.ok(json.routing.attention && typeof json.routing.attention === "object" && !Array.isArray(json.routing.attention),
+    "config.example.json should carry a routing.attention object");
+  assert.equal(json.automation.level, "manual",
+    "the example must still not model turning automation on");
+  const md = read("templates/config.example.md");
+  assert.ok(md.includes("`attention`"), "config.example.md should document attention");
+  assert.ok(md.includes('"highways"'), "config.example.md should document the highways rung");
+});

@@ -52,7 +52,8 @@ ever inserts itself into the DELEGATE-routed tasks' path.
 
 When the project's `.lanes/config.json` declares an `automation.level`
 above `"manual"`, the handoffs between these stages run unattended per
-the Roundabout trust ladder — see Section C item 6 and `/lanes-run`.
+the Roundabout trust ladder — see Section C item 6, `/lanes-run`, and
+(at the top rung) `/lanes-highway`.
 
 ## Section B — the planning hook (load-bearing)
 
@@ -125,7 +126,15 @@ Once the plan is approved:
    → always stop for the human. At `"conveyor"`, run
    `/lanes-run <plan>` instead of stepping through items 1–5 manually —
    it drives the whole Task/Lane Map and parks anything needing a
-   human. At every level: security-routed work never runs unattended,
+   human.
+   At `"highways"`, `/lanes-highway <feature>` adds the level above
+   the conveyor: stream decomposition with one human gate (the stream
+   map), unattended per-stream planning via `lanes-stream-planner`,
+   concurrent stream execution, and a `highway/integration` branch +
+   review document — the working branch is never touched. In any
+   unattended walk, a task whose Touch matches a `routing.attention`
+   category parks for the human, exactly like security-routed work.
+   At every level: security-routed work never runs unattended,
    and nothing is ever pushed to a remote.
 
 ## Section D — prerequisites
