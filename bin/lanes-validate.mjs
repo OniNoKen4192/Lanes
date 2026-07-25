@@ -627,6 +627,40 @@ function runAudit(taskIdArg) {
   process.exit(report.verdict === "clean" ? 0 : 2);
 }
 
+// ---------------------------------------------------------------- attention
+
+// Deterministic attention-topic query (design spec
+// 2026-07-25-highways-streams §2.2): which routing.attention categories
+// does this spec's Touch list match? Informational — exit 0 with or
+// without matches; the conveyor/highway procedures park a task on any
+// match instead of re-implementing glob matching in prose.
+function runAttention(specPathArg) {
+  if (!specPathArg) { console.error("attention: --spec <path> required"); process.exit(1); }
+  const root = git("rev-parse", "--show-toplevel");
+  process.chdir(root);
+  let config;
+  try { config = loadConfig(mainRepoRoot()); } catch (err) {
+    console.log(JSON.stringify({ ok: false, check: "attention", reason: String(err.message || err) }));
+    process.exit(2);
+  }
+  const specPath = normalizePath(specPathArg);
+  if (!fs.existsSync(specPath)) {
+    console.log(JSON.stringify({ ok: false, check: "attention", reason: `spec file not found: ${specPath}` }));
+    process.exit(2);
+  }
+  const spec = parseSpec(specBody(fs.readFileSync(specPath, "utf8")));
+  if (!spec.touch.length) {
+    console.log(JSON.stringify({ ok: false, check: "attention", reason: "spec's Touch table is empty or unparseable" }));
+    process.exit(2);
+  }
+  const matches = {};
+  for (const [category, patterns] of Object.entries(config.routing.attention)) {
+    const hits = spec.touch.map(normalizePath).filter((p) => matchAny(patterns, p));
+    if (hits.length) matches[category] = hits;
+  }
+  console.log(JSON.stringify({ matches }));
+}
+
 // ---------------------------------------------------------------- doctor
 
 const PM_RUNNERS = new Set(["pnpm", "npm", "yarn", "bun", "npx"]);
@@ -688,6 +722,8 @@ function runDoctor() {
       ...config.routing.security_routed.map((p) => ["routing.security_routed", p]),
       ...config.routing.do_not_touch.map((p) => ["routing.do_not_touch", p]),
       ...Object.keys(config.review_suite?.route_map ?? {}).map((p) => ["review_suite.route_map", p]),
+      ...Object.entries(config.routing.attention).flatMap(([cat, globs]) =>
+        globs.map((p) => [`routing.attention.${cat}`, p])),
     ];
     let globStatus = "pass";
     const preview = [];
@@ -766,10 +802,16 @@ function runDoctor() {
   }
 
   const failed = Object.values(checks).some((c) => c.status === "fail");
-  // Informational only (design spec 2026-07-25-roundabout-automation §6):
-  // the declared trust level is reported, never judged — not a check.
+  // Informational only (design specs 2026-07-25-roundabout-automation §6,
+  // 2026-07-25-highways-streams §2.2): declared trust level and attention
+  // categories are reported, never judged — not checks.
   console.log(JSON.stringify(
-    { verdict: failed ? "not_safe" : "ok", automation: config ? config.automation : null, checks },
+    {
+      verdict: failed ? "not_safe" : "ok",
+      automation: config ? config.automation : null,
+      attention: config ? Object.keys(config.routing.attention) : null,
+      checks,
+    },
     null, 2));
   process.exit(failed ? 2 : 0);
 }
@@ -889,11 +931,12 @@ try {
   if (cmd === "selftest") runSelftest();
   else if (cmd === "gate") runGate(argOf("--spec"));
   else if (cmd === "audit") runAudit(argOf("--task"));
+  else if (cmd === "attention") runAttention(argOf("--spec"));
   else if (cmd === "doctor") runDoctor();
   else if (cmd === "worktree" && rest[0] === "create") runWorktreeCreate(argOf("--spec"));
   else if (cmd === "worktree" && rest[0] === "remove") runWorktreeRemove(argOf("--task"), rest.includes("--force"));
   else {
-    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | doctor | worktree create --spec <path> | worktree remove --task <id> [--force] | selftest>");
+    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | attention --spec <path> | doctor | worktree create --spec <path> | worktree remove --task <id> [--force] | selftest>");
     process.exit(1);
   }
 } catch (err) {

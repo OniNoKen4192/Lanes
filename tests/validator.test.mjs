@@ -410,6 +410,7 @@ describe("doctor: absent automation block reports manual", () => {
     const r = validate(fx.dir, "doctor");
     assert.equal(r.json.automation.level, "manual");
     assert.equal(r.json.automation.max_fix_rounds, 2);
+    assert.deepEqual(r.json.attention, []);
   });
 });
 
@@ -450,5 +451,68 @@ describe("gate: bad attention shape refused", () => {
     assert.notEqual(r.status, 0);
     assert.ok((r.stdout + r.stderr).includes("routing.attention"),
       `expected a routing.attention error, got: ${r.stdout} ${r.stderr}`);
+  });
+});
+
+describe("attention: matching categories reported", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.routing.attention = { lib: ["src/lib/**"], billing: ["src/billing/**"] };
+  } });
+  after(() => fx.cleanup());
+
+  test("attention: matching categories reported", () => {
+    const r = validate(fx.dir, "attention", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json.matches, { lib: ["src/lib/thing.js", "src/lib/thing.test.js"] });
+  });
+});
+
+describe("attention: no match is an empty map", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.routing.attention = { billing: ["src/billing/**"] };
+  } });
+  after(() => fx.cleanup());
+
+  test("attention: no match is an empty map", () => {
+    const r = validate(fx.dir, "attention", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json.matches, {});
+  });
+});
+
+describe("attention: absent block is an empty map", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("attention: absent block is an empty map", () => {
+    const r = validate(fx.dir, "attention", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json.matches, {});
+  });
+});
+
+describe("attention: missing spec fails closed", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("attention: missing spec fails closed", () => {
+    const r = validate(fx.dir, "attention", "--spec", "docs/tasks/NOPE.md");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.check, "attention");
+  });
+});
+
+describe("doctor: attention categories reported and previewed", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.routing.attention = { lib: ["src/lib/**"] };
+  } });
+  after(() => fx.cleanup());
+
+  test("doctor: attention categories reported and previewed", () => {
+    const r = validate(fx.dir, "doctor");
+    assert.deepEqual(r.json.attention, ["lib"]);
+    const entry = r.json.checks.globs.patterns.find((p) => p.list === "routing.attention.lib");
+    assert.ok(entry, `expected a routing.attention.lib preview entry, got: ${JSON.stringify(r.json.checks.globs.patterns)}`);
+    assert.ok(entry.matches >= 1, `expected src/lib/** to match tracked files, got: ${JSON.stringify(entry)}`);
   });
 });

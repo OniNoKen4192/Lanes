@@ -73,6 +73,10 @@ informational line — the declared trust level and fix cap (defaults
 `manual` / `2` when the config has no `automation` block). It is
 information, not a check: it never affects the verdict.
 
+Render the top-level `attention` field the same way — the declared
+attention-category names (`[]` when none); their globs already appear
+in the `globs` preview as `routing.attention.<category>` entries.
+
 ## Step 2 — backend reachability (session-side)
 
 The one check Node cannot do: look at the MCP tools actually callable
