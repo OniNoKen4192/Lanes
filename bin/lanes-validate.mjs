@@ -281,6 +281,31 @@ function runSchemaChecks() {
   return failures;
 }
 
+// [command string, expected resolveTarget() result]
+const TOKENIZER_VECTORS = [
+  ["pnpm vitest run", { kind: "pm", runner: "pnpm", target: "vitest" }],
+  ["npm run test", { kind: "pm", runner: "npm", target: "test" }],
+  ["yarn test", { kind: "pm", runner: "yarn", target: "test" }],
+  ["npx tsc --noEmit", { kind: "pm", runner: "npx", target: "tsc" }],
+  ["bun run lint", { kind: "pm", runner: "bun", target: "lint" }],
+  ["pnpm exec playwright test", { kind: "pm", runner: "pnpm", target: "playwright" }],
+  ["cargo test", { kind: "bare", binary: "cargo" }],
+  ["", { kind: "empty" }],
+  ["pnpm", { kind: "pm", runner: "pnpm", target: null }],
+];
+
+function runTokenizerChecks() {
+  let failures = 0;
+  for (const [cmd, want] of TOKENIZER_VECTORS) {
+    const got = resolveTarget(cmd);
+    if (JSON.stringify(got) !== JSON.stringify(want)) {
+      failures++;
+      console.error(`FAIL tokenizer(${JSON.stringify(cmd)}): got ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+    }
+  }
+  return failures;
+}
+
 const SAMPLE_SPEC = `# TASK: sample
 ## Meta
 - **Task ID**: DEMO.03
@@ -317,7 +342,7 @@ function runParseChecks() {
 // ---------------------------------------------------------------- selftest
 
 function runSelftest() {
-  let failures = runParseChecks() + runSchemaChecks();
+  let failures = runParseChecks() + runSchemaChecks() + runTokenizerChecks();
   for (const [pattern, p, expected] of MATCH_VECTORS) {
     const got = matchesPattern(pattern, p);
     if (got !== expected) {
@@ -326,7 +351,7 @@ function runSelftest() {
     }
   }
   console.log(failures === 0
-    ? `selftest OK (${MATCH_VECTORS.length} match vectors + ${SCHEMA_VECTORS.length} schema vectors + parse checks)`
+    ? `selftest OK (${MATCH_VECTORS.length} match vectors + ${SCHEMA_VECTORS.length} schema vectors + ${TOKENIZER_VECTORS.length} tokenizer vectors + parse checks)`
     : `selftest: ${failures} failure(s)`);
   process.exit(failures === 0 ? 0 : 2);
 }
@@ -534,6 +559,149 @@ function runAudit(taskIdArg) {
   process.exit(report.verdict === "clean" ? 0 : 2);
 }
 
+// ---------------------------------------------------------------- doctor
+
+const PM_RUNNERS = new Set(["pnpm", "npm", "yarn", "bun", "npx"]);
+
+// "pnpm vitest run" → {kind:"pm", runner:"pnpm", target:"vitest"};
+// "npm run test" → target "test"; "cargo test" → {kind:"bare", binary:"cargo"}.
+function resolveTarget(cmd) {
+  const tokens = String(cmd).trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return { kind: "empty" };
+  if (PM_RUNNERS.has(tokens[0])) {
+    const target = (tokens[1] === "run" || tokens[1] === "exec") ? tokens[2] : tokens[1];
+    return { kind: "pm", runner: tokens[0], target: target ?? null };
+  }
+  return { kind: "bare", binary: tokens[0] };
+}
+
+function onPath(bin) {
+  const exts = process.platform === "win32"
+    ? (process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD").split(";")
+    : [];
+  for (const dir of (process.env.PATH || "").split(path.delimiter)) {
+    if (!dir) continue;
+    for (const ext of ["", ...exts]) {
+      try { fs.accessSync(path.join(dir, bin + ext)); return true; } catch {}
+    }
+  }
+  return false;
+}
+
+const RANK = { pass: 0, warn: 1, fail: 2 };
+function worst(a, b) { return RANK[a] >= RANK[b] ? a : b; }
+
+// Health report (design spec §4). Exit 0 iff no check failed; warns never
+// block. Checks 2 and 4 are the same code paths the gate itself runs —
+// the doctor previews exactly what the gate will enforce.
+function runDoctor() {
+  const root = git("rev-parse", "--show-toplevel");
+  process.chdir(root);
+  const checks = {};
+
+  // Check 1 — schema (§4.1): loadConfig succeeding IS the check.
+  let config = null;
+  try {
+    config = loadConfig();
+    checks.schema = { status: "pass" };
+  } catch (err) {
+    checks.schema = { status: "fail", reason: String(err.message || err) };
+    for (const c of ["globs", "commands", "baseline"]) {
+      checks[c] = { status: "fail", reason: "skipped — config did not load" };
+    }
+  }
+
+  if (config) {
+    // Check 2 — glob preview (§4.2): every routing pattern against the
+    // tracked tree, using the one true matcher. Zero matches = warn (a
+    // not-yet-created path is legitimate); malformed pattern = fail.
+    const tracked = git("ls-files").split("\n").filter(Boolean).map(normalizePath);
+    const patterns = [
+      ...config.routing.security_routed.map((p) => ["routing.security_routed", p]),
+      ...config.routing.do_not_touch.map((p) => ["routing.do_not_touch", p]),
+      ...Object.keys(config.review_suite?.route_map ?? {}).map((p) => ["review_suite.route_map", p]),
+    ];
+    let globStatus = "pass";
+    const preview = [];
+    for (const [list, pattern] of patterns) {
+      const norm = normalizePath(pattern);
+      if (path.isAbsolute(norm) || norm.includes(":") || /(^|\/)\.\.(\/|$)/.test(norm)) {
+        preview.push({ list, pattern, error: "malformed pattern — absolute path, drive letter, or '..' segment" });
+        globStatus = worst(globStatus, "fail");
+        continue;
+      }
+      const matches = tracked.filter((f) => matchesPattern(pattern, f));
+      preview.push({ list, pattern, matches: matches.length, sample: matches.slice(0, 5) });
+      if (!matches.length) globStatus = worst(globStatus, "warn");
+    }
+    checks.globs = { status: globStatus, patterns: preview };
+
+    // Check 3 — command resolution (§4.3) against the manifest at
+    // app_subdir (commands are stored without command_prefix). Resolution
+    // order: manifest scripts → dependency names → node_modules/.bin →
+    // warn. Unresolvable is a warn, never a fail — the manifest cannot
+    // prove every valid command wrong.
+    const appDir = config.project.app_subdir || ".";
+    const manifestPath = normalizePath(path.join(appDir, "package.json"));
+    let manifest = null;
+    if (fs.existsSync(manifestPath)) {
+      try { manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")); } catch { manifest = null; }
+    }
+    const known = new Set([
+      ...Object.keys(manifest?.scripts ?? {}),
+      ...Object.keys(manifest?.dependencies ?? {}),
+      ...Object.keys(manifest?.devDependencies ?? {}),
+    ]);
+    let cmdStatus = "pass";
+    const resolved = [];
+    for (const [name, cmd] of Object.entries(config.commands)) {
+      const t = resolveTarget(cmd);
+      let entry;
+      if (t.kind === "empty") {
+        entry = { command: name, status: "pass", note: "no such step (empty string)" };
+      } else if (t.kind === "pm") {
+        if (!manifest) {
+          entry = { command: name, status: "warn", note: `no readable manifest at ${manifestPath}` };
+        } else if (!t.target) {
+          entry = { command: name, status: "warn", note: `'${cmd}' names no script or binary after '${t.runner}'` };
+        } else if (known.has(t.target)) {
+          entry = { command: name, status: "pass", resolved: t.target };
+        } else if (["", ".cmd", ".ps1"].some((ext) =>
+            fs.existsSync(path.join(appDir, "node_modules", ".bin", t.target + ext)))) {
+          entry = { command: name, status: "pass", resolved: `node_modules/.bin/${t.target}` };
+        } else {
+          entry = { command: name, status: "warn", note: `'${t.target}' not in ${manifestPath} scripts or dependencies` };
+        }
+      } else {
+        entry = onPath(t.binary)
+          ? { command: name, status: "pass", resolved: t.binary }
+          : { command: name, status: "warn", note: `'${t.binary}' not found on PATH` };
+      }
+      cmdStatus = worst(cmdStatus, entry.status);
+      resolved.push(entry);
+    }
+    checks.commands = { status: cmdStatus, commands: resolved };
+
+    // Check 4 — clean baseline (§4.4): the gate's clean-tree check,
+    // standalone. Any dirty path outside the pipeline allowlist = fail.
+    const allowlist = [".lanes", config.pipeline.tasks_dir, config.pipeline.plans_dir, config.pipeline.ledger];
+    const dirty = [];
+    for (const line of git("status", "--porcelain", "--untracked-files=all").split("\n")) {
+      if (!line.trim()) continue;
+      for (const p of statusPaths(line)) {
+        if (!matchAny(allowlist, p)) dirty.push(p);
+      }
+    }
+    checks.baseline = dirty.length
+      ? { status: "fail", reason: "working tree is not clean — commit or stash before dispatching", dirty }
+      : { status: "pass" };
+  }
+
+  const failed = Object.values(checks).some((c) => c.status === "fail");
+  console.log(JSON.stringify({ verdict: failed ? "not_safe" : "ok", checks }, null, 2));
+  process.exit(failed ? 2 : 0);
+}
+
 // ---------------------------------------------------------------- CLI
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -546,8 +714,9 @@ try {
   if (cmd === "selftest") runSelftest();
   else if (cmd === "gate") runGate(argOf("--spec"));
   else if (cmd === "audit") runAudit(argOf("--task"));
+  else if (cmd === "doctor") runDoctor();
   else {
-    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | selftest>");
+    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | doctor | selftest>");
     process.exit(1);
   }
 } catch (err) {
