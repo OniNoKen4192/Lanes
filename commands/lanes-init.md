@@ -2,7 +2,7 @@
 description: >
   Onboarding entry point for the Lanes cross-model pipeline. Inspects the
   current project (package manifest, verification commands, source tree,
-  existing conventions) and drafts `.lanes/config.md` — the one per-project
+  existing conventions) and drafts `.lanes/config.json` — the one per-project
   file every other Lanes command and agent reads. Refuses below a named
   readiness floor instead of guessing; interviews you only on what
   inspection could not settle; never overwrites an existing config.
@@ -12,7 +12,7 @@ description: >
 
 No argument. Run this once, from the root of the project you want Lanes to
 operate on. It reads; it does not modify your source. Its only writes are
-`.lanes/config.md` (and, optionally, a starter `AGENTS.md`) — both gated by
+`.lanes/config.json` (and, optionally, a starter `AGENTS.md`) — both gated by
 the no-clobber rule in Phase 3.
 
 ## The discipline (read before doing anything)
@@ -96,7 +96,7 @@ found here is a **proposal** for Phase 2 to confirm, not a final answer.
   `CLAUDE.md` at the repo root. If one exists, read it for conventions
   worth carrying forward (stack facts, standing exclusions) — do not
   overwrite it in Phase 3 either way; the no-write-to-AGENTS.md-if-present
-  rule is separate from and in addition to the `.lanes/config.md`
+  rule is separate from and in addition to the `.lanes/config.json`
   no-clobber rule.
 - **Review suite.** Look for an end-to-end / UX test directory or a
   documented workflow-ID coverage table distinct from the unit test
@@ -145,38 +145,47 @@ Phase 1 found no e2e suite AND the user has already confirmed "omit").
 
 ## Phase 3 — emit + confirm
 
-**No-clobber, checked first.** If `.lanes/config.md` already exists in
+**No-clobber, checked first.** If `.lanes/config.json` already exists in
 this repo, **do not overwrite it.** Report that it already exists and
 stop — the same rule the emitter observes for individual spec files. This
-check happens before any writing, not after drafting.
+check happens before any writing, not after drafting. (A repo with only a
+legacy Markdown config is not a clobber case — it has no `config.json`; note
+that `/lanes-doctor` also offers a direct migration, and proceed only if
+the user prefers a fresh init.)
 
 With the floor clear and no existing config in the way:
 
-1. Read `${CLAUDE_PLUGIN_ROOT}/templates/config.example.md` in full — it
-   is the output shape and the frozen field-name contract. Resolve it via
-   Bash, e.g. `cat "${CLAUDE_PLUGIN_ROOT}/templates/config.example.md"`.
-2. Write `.lanes/config.md` in the same shape: same section headers, same
-   guiding comments (keep them — they are what a future reader uses to
-   understand why each field exists), but with the illustrative example
-   values replaced by this project's inferred-and-confirmed values from
-   Phases 1–2. Every frozen field name in `config.example.md` that applies
-   to this project must appear; `review_suite` is the one block that may
-   be omitted entirely when Phase 2 confirmed there is no suite.
+1. Read `${CLAUDE_PLUGIN_ROOT}/templates/config.example.json` in full — it
+   is the output shape and the frozen field-name contract — and
+   `${CLAUDE_PLUGIN_ROOT}/templates/config.example.md`, the field-by-field
+   reference explaining what each key means. Resolve them via Bash, e.g.
+   `cat "${CLAUDE_PLUGIN_ROOT}/templates/config.example.json"`.
+2. Write `.lanes/config.json` as a schema-v1 JSON file in exactly the
+   `config.example.json` shape (`schema_version: 1` and the `project`,
+   `commands`, `backend`, `routing`, `pipeline` blocks; `review_suite` is
+   the one block that may be omitted entirely when Phase 2 confirmed
+   there is no suite), with the illustrative example values replaced by
+   this project's inferred-and-confirmed values from Phases 1–2. JSON
+   carries no comments — the guidance lives in `config.example.md`; do
+   not try to embed commentary. `backend.ratelimit_signal` is an array of
+   substrings. `""` is allowed for `commands.lint` / `commands.typecheck`
+   when the project has no such step.
 3. **`AGENTS.md`.** If the repo has no `AGENTS.md` (Phase 1), offer to
    write a starter stub — not a full architecture document. The stub
    states the stack, the verification commands, and the standing
-   do-not-touch list, and points at `.lanes/config.md` as the source of
+   do-not-touch list, and points at `.lanes/config.json` as the source of
    truth for pipeline parameters. Do **not** fabricate architecture prose,
    history, or design rationale you have no evidence for; leave explicit
    `TODO` markers for sections only the user can fill in. If an
    `AGENTS.md` already exists, leave it untouched — offer only to note
-   where it should reference `.lanes/config.md`, and let the user apply
+   where it should reference `.lanes/config.json`, and let the user apply
    that edit themselves.
-4. Show the full draft of `.lanes/config.md` (and the `AGENTS.md` stub, if
-   offered and accepted) before finishing.
+4. Show the full draft of `.lanes/config.json` (and the `AGENTS.md` stub,
+   if offered and accepted) before finishing.
 5. Print next steps, in this order: review the draft; commit `.lanes/` and
-   `AGENTS.md`; then plan your first effort — lane assignment happens
-   during `writing-plans`, per the lanes skill.
+   `AGENTS.md`; run `/lanes-doctor` to verify the config against the
+   repo; then plan your first effort — lane assignment happens during
+   `writing-plans`, per the lanes skill.
 
 ## Report format
 
@@ -191,7 +200,8 @@ End with:
 3. **Interview answers** — each Phase 2 question actually asked and the
    confirmed answer; note any question skipped because Phase 1 already
    settled it with a quick confirm rather than an open ask.
-4. **Files written** — `.lanes/config.md` path, and `AGENTS.md` path if a
-   stub was written; or, on the no-clobber path, the single line reporting
-   that `.lanes/config.md` already existed and nothing was written.
+4. **Files written** — `.lanes/config.json` path, and `AGENTS.md` path if
+   a stub was written; or, on the no-clobber path, the single line
+   reporting that `.lanes/config.json` already existed and nothing was
+   written.
 5. **Next steps** — the Phase 3 message verbatim.
