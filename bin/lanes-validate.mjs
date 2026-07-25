@@ -180,8 +180,10 @@ function parseSpec(text) {
 // append-only audit trail: hashing only the body lets the appendix grow
 // without tripping spec_modified, while any edit to the original
 // sections still trips it.
+// The tail is trimmed so a natural blank separator before the marker
+// (appending "\n## Amendments" to a newline-terminated file) is not a false tamper.
 function specBody(text) {
-  return text.split(/^## Amendments[ \t]*$/m)[0];
+  return text.split(/^## Amendments[ \t]*$/m)[0].replace(/\s+$/, "");
 }
 
 // Mirrors the examples table in docs/PATH-MATCHING.md — keep in sync.
