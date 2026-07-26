@@ -10,6 +10,16 @@ Parking lot for feature ideas and future development. Nothing here is committed 
 
 ## Ideas
 
+### Backend exhaustion failover
+- **What:** What the pipeline does when the DELEGATE backend runs out of subscription usage entirely (usage cap, not a per-tier blip) — today every task RATE_LIMITEDs down the tier list and then parks, which stalls whole conveyor/highway runs for hours.
+- **Why:** Codex caps reset on a schedule; a run that parks everything at 2pm and could have resumed at 5pm — or flowed to a cheaper alternative — wastes the whole point of unattended mode.
+- **Notes:**
+  - Detection already exists (`ratelimit_signal` → RATE_LIMITED → tier fallback → park after last tier); the missing piece is what happens NEXT.
+  - Candidate shapes: (a) park-and-resume — record the cap window, run report says when to resume, maybe a `/lanes-resume`; (b) fallback backend chain — config lists a second backend behind the seam (the seam was built for this); (c) fallback to an in-session subagent implementer on a cheaper Claude tier — no MCP needed, keeps flowing, spends Claude quota instead.
+  - Open: which shape (or a declared ladder of them), where it's declared in config, and how the safety floor applies (same gate/audit machinery regardless of who implements).
+  - Brainstorm started 2026-07-25 (context: `agents/lanes-implementer.md` SEAM block + RATE_LIMITED taxonomy reviewed); parked before the first clarifying question.
+- **Added:** 2026-07-25
+
 <!-- Template:
 ### Idea name
 - **What:** one-line description
