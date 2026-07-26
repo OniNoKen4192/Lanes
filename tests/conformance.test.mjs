@@ -475,3 +475,44 @@ test("highways: config templates document attention and the fourth rung", () => 
   assert.ok(md.includes("`attention`"), "config.example.md should document attention");
   assert.ok(md.includes('"highways"'), "config.example.md should document the highways rung");
 });
+
+// ------------------------------------------------ User guide (2026-07-25)
+
+test("user guide: load-bearing facts stay true", () => {
+  const guide = read("docs/USER-GUIDE.md");
+
+  // The ladder, in order, and its declaration surface.
+  assert.ok(guide.includes("`manual → verdicts → conveyor → highways`"),
+    "the guide should state the four-rung ladder in order");
+  for (const term of ["automation", "max_fix_rounds", ".lanes/config.json"]) {
+    assert.ok(guide.includes(term), `the guide should mention ${JSON.stringify(term)}`);
+  }
+
+  // Every user-facing command and agent it teaches must still exist by name.
+  for (const term of [
+    "/lanes-init", "/lanes-doctor", "/lanes-emit", "/lanes-run <plan>",
+    "/lanes-highway <feature>", "lanes-implementer", "lanes-reviewer",
+  ]) {
+    assert.ok(guide.includes(term), `the guide should mention ${JSON.stringify(term)}`);
+  }
+
+  // Park semantics and the safety floor.
+  for (const term of [
+    "park", "routing.attention", "security_routed", "REJECT", "APPROVE",
+    "highway/integration", "git merge highway/integration",
+  ]) {
+    assert.ok(guide.includes(term), `the guide should mention ${JSON.stringify(term)}`);
+  }
+  assert.ok(!guide.includes("git push"), "the guide must not teach pushing as part of any run");
+
+  // Its cross-links resolve, and the README actually points readers at it.
+  for (const target of [
+    "templates/config.example.md", "templates/ROUTING.md", "skills/lanes/SKILL.md",
+    "commands/lanes-run.md", "commands/lanes-highway.md", "docs/PATH-MATCHING.md",
+  ]) {
+    assert.ok(fs.existsSync(path.join(repoRoot, target)),
+      `guide link target should exist: ${target}`);
+  }
+  assert.ok(read("README.md").includes("docs/USER-GUIDE.md"),
+    "README should link the user guide");
+});
