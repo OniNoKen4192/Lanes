@@ -516,3 +516,24 @@ test("user guide: load-bearing facts stay true", () => {
   assert.ok(read("README.md").includes("docs/USER-GUIDE.md"),
     "README should link the user guide");
 });
+
+// ------------------------------------------------ Claude failover (2026-07-26)
+
+test("failover agent: lanes-claude-implementer contract", () => {
+  const agent = read("agents/lanes-claude-implementer.md");
+  assert.ok(agent.includes("name: lanes-claude-implementer"),
+    "agent frontmatter should carry its name");
+  assert.ok(!agent.includes("mcp__"),
+    "the failover agent must not name any MCP tool — it has no external backend");
+  for (const term of [
+    "gate --spec",
+    "audit --task",
+    "Never run any git command that writes",
+    "the controller owns git state",
+    "STATUS: IMPLEMENTED | IMPLEMENTED_WITH_DEVIATIONS | BLOCKED",
+  ]) {
+    assert.ok(agent.includes(term), `lanes-claude-implementer.md should mention ${JSON.stringify(term)}`);
+  }
+  assert.ok(!agent.includes("BLOCKED | BACKEND_FAILURE"),
+    "the failover agent must not enumerate the five-status taxonomy — only three statuses are reachable");
+});
