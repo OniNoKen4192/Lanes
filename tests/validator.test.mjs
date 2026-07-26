@@ -516,3 +516,25 @@ describe("doctor: attention categories reported and previewed", () => {
     assert.ok(entry.matches >= 1, `expected src/lib/** to match tracked files, got: ${JSON.stringify(entry)}`);
   });
 });
+
+describe("doctor: failover_tiers reported when declared", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => { c.backend.failover_tiers = ["opus", "sonnet", "haiku"]; } });
+  after(() => fx.cleanup());
+
+  test("doctor: failover_tiers reported when declared", () => {
+    const r = validate(fx.dir, "doctor");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json.failover_tiers, ["opus", "sonnet", "haiku"]);
+  });
+});
+
+describe("doctor: failover_tiers normalized to [] when absent", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("doctor: failover_tiers normalized to [] when absent", () => {
+    const r = validate(fx.dir, "doctor");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json.failover_tiers, []);
+  });
+});

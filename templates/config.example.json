@@ -24,6 +24,11 @@
       "usage-cap",
       "429",
       "rate limit"
+    ],
+    "failover_tiers": [
+      "opus",
+      "sonnet",
+      "haiku"
     ]
   },
   "routing": {

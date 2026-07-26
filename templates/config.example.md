@@ -64,6 +64,17 @@ Resolved from your package manifest (package.json scripts) at init;
   a tier instead of getting a false BACKEND_FAILURE. The example values
   are illustrative — the exact substrings depend on your backend's
   actual error text.
+- `failover_tiers` (array of strings, optional): declared Claude
+  failover. Claude model aliases for the Agent tool's `model` parameter,
+  best→cheapest like `tiers`. In an unattended run, a task whose
+  dispatch exhausts every backend tier re-dispatches ONCE to
+  `lanes-claude-implementer` at `failover_tiers[i]`, where `i` is the
+  task tier's index in `tiers`, clamped to the last entry. Absent or
+  `[]` means no failover — exhaustion parks the task, as always.
+  Declaring this field IS the pre-authorization to spend Claude quota
+  on DELEGATE-routed work; there is no per-run prompt. Aliases are not
+  validated (they evolve with the platform); a bad alias fails the
+  Agent dispatch and the task parks.
 
 ## `routing`
 

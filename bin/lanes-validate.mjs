@@ -74,6 +74,7 @@ const SCHEMA_V1 = {
     approval_mode: "string",
     tiers: "string[]",
     ratelimit_signal: "string[]",
+    failover_tiers: "string[]?",
   },
   routing: {
     security_routed: "string[]",
@@ -133,6 +134,8 @@ function validateConfig(cfg) {
         errors.push(`'${block}.${key}' must be a string`);
       } else if (type === "string[]" && !isStringArray(v)) {
         errors.push(`'${block}.${key}' must be an array of strings`);
+      } else if (type === "string[]?" && !isStringArray(v)) {
+        errors.push(`'${block}.${key}' must be an array of strings`);
       } else if (type === "route_map"
           && (typeof v !== "object" || v === null || Array.isArray(v)
               || !Object.values(v).every(isStringArray))) {
@@ -174,13 +177,15 @@ function loadConfig(rootDir = ".") {
     throw new Error(`.lanes/config.json failed schema v1 validation: ${errors.join("; ")}`);
   }
   // Normalize (design specs 2026-07-25-roundabout-automation §2,
-  // 2026-07-25-highways-streams §2.2): downstream consumers never branch
-  // on absence — automation and routing.attention are always present.
+  // 2026-07-25-highways-streams §2.2, 2026-07-26-claude-failover §2):
+  // downstream consumers never branch on absence — automation,
+  // routing.attention, and backend.failover_tiers are always present.
   cfg.automation = {
     level: cfg.automation?.level ?? "manual",
     max_fix_rounds: cfg.automation?.max_fix_rounds ?? 2,
   };
   cfg.routing.attention = cfg.routing.attention ?? {};
+  cfg.backend.failover_tiers = cfg.backend.failover_tiers ?? [];
   return cfg;
 }
 
@@ -298,6 +303,10 @@ const SCHEMA_VECTORS = [
   ["wrong type for tiers", (c) => { c.backend.tiers = "sol"; }, "array of strings"],
   ["bad approval_mode", (c) => { c.backend.approval_mode = "yolo"; }, "approval_mode"],
   ["empty tiers", (c) => { c.backend.tiers = []; }, "non-empty"],
+  ["failover_tiers declared", (c) => { c.backend.failover_tiers = ["opus", "sonnet", "haiku"]; }, null],
+  ["failover_tiers empty allowed", (c) => { c.backend.failover_tiers = []; }, null],
+  ["failover_tiers wrong type", (c) => { c.backend.failover_tiers = "opus"; }, "array of strings"],
+  ["failover_tiers non-string entry", (c) => { c.backend.failover_tiers = [1]; }, "array of strings"],
   ["empty test command", (c) => { c.commands.test = ""; }, "commands.test"],
   ["route_map value not an array", (c) => {
     c.review_suite = {
@@ -810,6 +819,7 @@ function runDoctor() {
       verdict: failed ? "not_safe" : "ok",
       automation: config ? config.automation : null,
       attention: config ? Object.keys(config.routing.attention) : null,
+      failover_tiers: config ? config.backend.failover_tiers : null,
       checks,
     },
     null, 2));

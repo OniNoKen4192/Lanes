@@ -117,7 +117,7 @@ test("§5.5 config vocabulary sync", () => {
   const VOCAB = {
     project: ["app_subdir", "command_prefix"],
     commands: ["test", "lint", "typecheck", "acceptance_runner"],
-    backend: ["name", "dispatch_tool", "reply_tool", "approval_mode", "tiers", "ratelimit_signal"],
+    backend: ["name", "dispatch_tool", "reply_tool", "approval_mode", "tiers", "ratelimit_signal", "failover_tiers"],
     routing: ["security_routed", "do_not_touch", "attention"],
     review_suite: ["suite_command", "id_pattern", "id_index", "route_map"],
     pipeline: ["plans_dir", "tasks_dir", "ledger"],
