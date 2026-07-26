@@ -12,6 +12,10 @@ scarcest, most expensive model tokens on boilerplate and mechanical work
 that a cheaper model can do just as correctly under a tight enough
 contract.
 
+**New here?** The [User Guide](docs/USER-GUIDE.md) walks the whole path
+— install, first project, the manual pipeline, and the trust ladder up
+to fully unattended runs.
+
 ## Prerequisites
 
 - **[superpowers](https://github.com/obra/superpowers)** installed —
@@ -93,6 +97,30 @@ Plan and Review are always KEEP (frontier judgment). Emit is a compiler,
 not a lane itself. Implement is where DELEGATE-routed work actually runs;
 KEEP-routed tasks skip Emit/Implement/Review entirely and stay in the
 superpowers loop.
+
+## The trust ladder: running unattended
+
+Everything above is `manual` mode — every stage change is a human
+handoff, and that's the default. When a project's pipeline history has
+earned your trust, you declare a higher rung in `.lanes/config.json`
+(`automation.level`) and the handoffs disappear one class at a time:
+
+| Rung | You still do | Runs unattended |
+|---|---|---|
+| `manual` | Everything | Nothing |
+| `verdicts` | Plan, emit, dispatch | Verdict handling (APPROVE → merge; FIX → re-dispatch up to a cap) |
+| `conveyor` | Approve the plan | The whole task graph, via `/lanes-run <plan>` |
+| `highways` | Approve one stream map | Multi-stream builds with parallel planning and an integration review, via `/lanes-highway <feature>` |
+
+Trust is declared, not earned by machinery — you flip the setting; the
+ledger history is evidence you consult, not a mechanism. A safety floor
+holds at every rung: security-routed and `routing.attention`-matched
+work always **parks** for a human instead of running unattended, REJECT
+is always a human decision, nothing is ever pushed to a remote, and a
+highway run never touches your working branch — its entire output is a
+`highway/integration` branch plus a review document you read before
+landing anything. The [User Guide](docs/USER-GUIDE.md) covers the
+ladder in detail.
 
 ## Honesty note
 
