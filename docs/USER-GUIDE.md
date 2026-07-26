@@ -200,7 +200,10 @@ extra controller-run audit after, the same frontier review. Declaring
 the field is you pre-authorizing Claude-quota spend for exactly this
 case; the run report marks each such task
 `implemented-by: claude/<model>`. Leave it out (or `[]`) and
-exhaustion parks, as always.
+exhaustion parks, as always. (One honest note: the hook that
+hard-gates backend dispatches can't fire here — there is no backend
+call to intercept — so the agent runs the same deterministic gate
+itself, and the controller re-runs the audit on every report.)
 
 The run ends when nothing dispatchable remains and reports two lists:
 **landed** (each with its merge commit) and **parked** (each with its

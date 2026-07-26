@@ -554,6 +554,8 @@ test("failover controller flow: commands, guide, templates agree", () => {
     "No third fallback",
     "No dry-state latch",
     "at the same model",
+    "failover_tiers[min(i, failover_tiers.length - 1)]",
+    "Failover never engages when `backend.failover_tiers` is absent",
   ]) {
     assert.ok(run.includes(term), `lanes-run.md should mention ${JSON.stringify(term)}`);
   }

@@ -102,7 +102,8 @@ After implementing, from inside the worktree:
 2. **Scope check** — read the report: every `out_of_scope` path, every
    `forbidden` path, and every entry in `commits_past_base` is a
    violation. `allowlisted` paths are pipeline-owned artifacts and are
-   not violations. List every violation under DEVIATIONS.
+   not violations. Do not revert anything yourself; list every
+   violation under DEVIATIONS.
 3. Run the **Acceptance test command**. Capture output.
 4. Run the **Regression guard** command — the project's
    `command_prefix` + `test` command (`.lanes/config.json`). Capture

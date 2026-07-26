@@ -39,7 +39,8 @@ immutable-spec amendments all apply to every dispatch exactly as always.
      existing cycle:
      `node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" worktree create --spec <spec-path>`,
      dispatch `lanes-implementer` (spec + worktree path) — a
-     RATE_LIMITED report with `backend.failover_tiers` declared
+     RATE_LIMITED report (tier fallback already exhausted every
+     configured tier) with `backend.failover_tiers` declared
      non-empty takes the Declared failover section below instead of
      parking — then `lanes-reviewer` (spec + implementer report + the
      SAME worktree path), then act on the verdict:
