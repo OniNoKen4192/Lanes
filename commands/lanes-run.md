@@ -38,9 +38,11 @@ immutable-spec amendments all apply to every dispatch exactly as always.
      reason — attention work never runs unattended. Otherwise the full
      existing cycle:
      `node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" worktree create --spec <spec-path>`,
-     dispatch `lanes-implementer` (spec + worktree path), then
-     `lanes-reviewer` (spec + implementer report + the SAME worktree
-     path), then act on the verdict:
+     dispatch `lanes-implementer` (spec + worktree path) — a
+     RATE_LIMITED report with `backend.failover_tiers` declared
+     non-empty takes the Declared failover section below instead of
+     parking — then `lanes-reviewer` (spec + implementer report + the
+     SAME worktree path), then act on the verdict:
      - **APPROVE** → commit the work inside the worktree, merge
        `lanes/<task-id>` into the working branch, `worktree remove
        --task <task-id>`, record the merge commit for the run report.
@@ -61,12 +63,58 @@ immutable-spec amendments all apply to every dispatch exactly as always.
    does not depend on it. Park on: reviewer REJECT, FIX rounds
    exhausted, implementer BLOCKED, implementer BACKEND_FAILURE,
    RATE_LIMITED after tier fallback has exhausted every configured
-   tier, security-routed arrival, or attention-category arrival. A parked task's worktree stays in
+   tier (and `backend.failover_tiers` is empty — otherwise the
+   Declared failover section runs first, and only its failure parks),
+   security-routed arrival, or attention-category arrival. A parked task's worktree stays in
    place, inspectable — never `worktree remove --force` a parked task.
 4. **Run report.** The run ends when nothing dispatchable remains.
    Report two lists: tasks landed (each with its merge commit) and
    tasks parked (each with its reason and, where one exists, its
    worktree path). Append to the pipeline ledger per task as always.
+
+## Declared failover (`backend.failover_tiers`)
+
+When `lanes-implementer` reports RATE_LIMITED — every configured
+backend tier exhausted — and the config's `backend.failover_tiers` is
+non-empty, the task does not park. Spec:
+`docs/superpowers/specs/2026-07-26-claude-failover-design.md` §4.
+
+1. **Map the model.** Let `i` be the index of the spec's `Model hint`
+   tier in `backend.tiers`; the failover model is
+   `failover_tiers[min(i, failover_tiers.length - 1)]` — index for
+   index, clamped to the last (cheapest) entry.
+2. **Re-dispatch the SAME task** — same spec, same worktree — to
+   `lanes-claude-implementer` via the Agent tool with `model:` set to
+   the mapped alias. One re-dispatch, not a ladder walk: the failover
+   list maps by tier; it is not a retry chain.
+3. **Mandatory audit re-run.** On ANY report from
+   `lanes-claude-implementer`, run
+   `node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" audit --task <task-id>`
+   yourself, from the main tree, BEFORE acting on the report. The
+   audit's JSON — not the agent's claims — is the changed-file
+   evidence handed to review. When they disagree: `out_of_scope`
+   entries the report omitted → treat the task as
+   IMPLEMENTED_WITH_DEVIATIONS with the audit's findings appended; any
+   `forbidden` path or `commits_past_base` entry → park the task
+   immediately, regardless of what the report claimed.
+4. **Review as always.** `lanes-reviewer` gets the spec, the report,
+   and the same worktree — a diff is a diff. A FIX round on a
+   failover-implemented task re-dispatches to
+   `lanes-claude-implementer` at the same model, not to the backend
+   (the pool is presumed still dry for this task). The
+   `automation.max_fix_rounds` cap applies unchanged.
+5. **No third fallback.** If the Agent dispatch itself fails
+   (Claude-side capacity or usage failure), park the task with the
+   error as the reason.
+6. **No dry-state latch.** Record nothing about backend health: the
+   NEXT task dispatches to `lanes-implementer` (the backend path)
+   exactly as always — if the cap has reset, work flows back to the
+   backend by itself; if not, that task's RATE_LIMITED re-routes it
+   too. A dry backend costs a few fast-failing calls per task; that is
+   the price of having zero failover state to corrupt.
+7. **Provenance.** Mark the task `implemented-by: claude/<model>` in
+   its ledger entry and in the run report's landed/parked lists.
+   Backend-implemented tasks carry no marker.
 
 ## Hard rules
 
@@ -79,3 +127,6 @@ immutable-spec amendments all apply to every dispatch exactly as always.
 - Never run at `automation.level` below `"conveyor"` — including "just
   this once" at the human's live prompting; the config declaration is
   the only authorization this command accepts.
+- Failover never engages when `backend.failover_tiers` is absent or
+  empty — parking is the default; the config declaration is the only
+  authorization for spending Claude quota on DELEGATE-routed work.

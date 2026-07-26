@@ -537,3 +537,29 @@ test("failover agent: lanes-claude-implementer contract", () => {
   assert.ok(!agent.includes("BLOCKED | BACKEND_FAILURE"),
     "the failover agent must not enumerate the five-status taxonomy — only three statuses are reachable");
 });
+
+// ------------------------------------------------ Controller failover (2026-07-26)
+
+test("failover controller flow: commands, guide, templates agree", () => {
+  const run = read("commands/lanes-run.md");
+  const hwy = read("commands/lanes-highway.md");
+  const guide = read("docs/USER-GUIDE.md");
+  for (const [label, text] of [["lanes-run.md", run], ["lanes-highway.md", hwy], ["USER-GUIDE.md", guide]]) {
+    assert.ok(text.includes("lanes-claude-implementer"), `${label} should name the failover agent`);
+    assert.ok(text.includes("failover_tiers"), `${label} should name the config field`);
+  }
+  for (const term of [
+    "audit --task",
+    "implemented-by: claude/",
+    "No third fallback",
+    "No dry-state latch",
+    "at the same model",
+  ]) {
+    assert.ok(run.includes(term), `lanes-run.md should mention ${JSON.stringify(term)}`);
+  }
+  assert.ok(hwy.includes("implemented-by: claude/"),
+    "lanes-highway.md review doc should carry the provenance marker");
+  const exampleMd = read("templates/config.example.md");
+  assert.ok(exampleMd.includes("lanes-claude-implementer"),
+    "config.example.md should say who implements under failover");
+});

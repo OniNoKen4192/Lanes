@@ -191,6 +191,17 @@ exhausted, implementer BLOCKED, backend failure, rate limits after
 every tier fell back, security-routed arrival, attention-category
 arrival.
 
+**Declared failover.** Set `backend.failover_tiers` (Claude model
+aliases, best → cheapest — e.g. `["opus", "sonnet", "haiku"]`) and a
+task that exhausts every backend tier doesn't park: it re-dispatches
+once to `lanes-claude-implementer`, where Claude writes the code
+itself at the alias mapped to the task's tier — same gate before, an
+extra controller-run audit after, the same frontier review. Declaring
+the field is you pre-authorizing Claude-quota spend for exactly this
+case; the run report marks each such task
+`implemented-by: claude/<model>`. Leave it out (or `[]`) and
+exhaustion parks, as always.
+
 The run ends when nothing dispatchable remains and reports two lists:
 **landed** (each with its merge commit) and **parked** (each with its
 reason and worktree path). Details: [`commands/lanes-run.md`](../commands/lanes-run.md).
@@ -258,7 +269,9 @@ message is the troubleshooting guide. The common ones:
   KEEP work is unaffected.
 - **RATE_LIMITED.** The dispatcher falls back a tier automatically;
   when every configured tier is exhausted, the task parks rather than
-  hammering the backend.
+  hammering the backend — unless `backend.failover_tiers` is declared,
+  in which case it re-dispatches once to `lanes-claude-implementer`
+  (see the conveyor section).
 - **"worktree already exists" / leftover parked worktrees.** Inspect,
   then dispose:
   `worktree remove --task <id>` (add `--force` to discard uncommitted

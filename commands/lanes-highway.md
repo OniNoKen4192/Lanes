@@ -62,7 +62,11 @@ immutable-spec amendments apply to every dispatch exactly as always.
    AFTER all its dependencies have merged; until then it waits, and it
    parks if any dependency parks or lands partial. Within a stream,
    walk its Task/Lane Map serially in dependency order exactly as
-   `/lanes-run` does, with three substitutions:
+   `/lanes-run` does — including its Declared failover section: a
+   RATE_LIMITED task with `backend.failover_tiers` declared re-dispatches
+   once to `lanes-claude-implementer` (mapped model, mandatory
+   controller-side `audit --task` re-run; the task worktree is already
+   cut from the stream branch) — with three substitutions:
    - **Attention check first.** Before dispatching any DELEGATE task, run
      `… attention --spec <spec-path>`; any matching category parks the task on
      arrival, category in the reason. A KEEP task whose Touch matches any `routing.attention` category
@@ -97,7 +101,9 @@ immutable-spec amendments apply to every dispatch exactly as always.
    branch). Contents, in order: stream map recap + base commit + gate
    record; per stream — plan path, tasks landed (each with its merge
    commit), tasks parked (each with reason and worktree path), FIX
-   rounds used, deviations; integration — merge order, conflicts
+   rounds used, deviations, failover-implemented tasks marked
+   `implemented-by: claude/<model>` (with a run-level failover count
+   in the recap); integration — merge order, conflicts
    parked, review findings by severity, attention parks grouped by
    category; the landing instruction
    (`git merge highway/integration`) and pointers to the pipeline
