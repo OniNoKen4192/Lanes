@@ -134,6 +134,13 @@ Once the plan is approved:
    review document — the working branch is never touched. In any
    unattended walk, a task whose Touch matches a `routing.attention`
    category parks for the human, exactly like security-routed work.
+   A task RATE_LIMITED past every backend tier parks too — unless the
+   config declares `backend.failover_tiers`, in which case the
+   controller re-dispatches it ONCE to `lanes-claude-implementer`
+   (Claude implements it directly, same gate and report contract, with
+   a mandatory controller-side audit re-run — see `/lanes-run`'s
+   Declared failover section) and marks it
+   `implemented-by: claude/<model>` in the ledger.
    At every level: security-routed work never runs unattended,
    and nothing is ever pushed to a remote.
 

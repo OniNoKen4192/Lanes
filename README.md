@@ -119,7 +119,13 @@ work always **parks** for a human instead of running unattended, REJECT
 is always a human decision, nothing is ever pushed to a remote, and a
 highway run never touches your working branch — its entire output is a
 `highway/integration` branch plus a review document you read before
-landing anything. The [User Guide](docs/USER-GUIDE.md) covers the
+landing anything. And when the DELEGATE backend's usage pool runs dry
+mid-run, tasks park by default — unless you've declared
+`backend.failover_tiers`, in which case each exhausted task
+re-dispatches once to a Claude implementer
+(`lanes-claude-implementer`) under the same gate, audit, and review,
+with the spend marked `implemented-by: claude/<model>` in the run
+report. The [User Guide](docs/USER-GUIDE.md) covers the
 ladder in detail.
 
 ## Honesty note
