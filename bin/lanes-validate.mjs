@@ -826,28 +826,6 @@ function runDoctor() {
   process.exit(failed ? 2 : 0);
 }
 
-// ---------------------------------------------------------------- seed
-
-// Session-start pointer (design spec 2026-07-26-rest-stop §5). The ONE
-// deliberate fail-OPEN surface in this file: a SessionStart hook must
-// never block or noise a session, so every failure mode — no repo, no
-// seed, unreadable file — is silence and exit 0. This subcommand only
-// reads and prints; failing open forfeits nothing the gate protects.
-function runSeedCheck() {
-  try {
-    const root = git("rev-parse", "--show-toplevel");
-    const p = path.join(root, ".lanes", "seed.md");
-    if (fs.existsSync(p)) {
-      const m = fs.readFileSync(p, "utf8").match(/^# Seed — (\d{4}-\d{2}-\d{2})/m);
-      const date = m ? m[1] : new Date(fs.statSync(p).mtime).toISOString().slice(0, 10);
-      console.log(`A rest-stop seed from ${date} exists — read .lanes/seed.md to resume.`);
-    }
-  } catch {
-    // silence — see the fail-open note above
-  }
-  process.exit(0);
-}
-
 // ---------------------------------------------------------------- worktree
 
 // Controller-owned per-task isolation (design spec
@@ -993,6 +971,28 @@ function runWorktreeRemove(idArg, force, kind) {
   let branchRemoved = true;
   try { git("branch", "-d", branch); } catch { branchRemoved = false; } // unmerged — kept deliberately
   console.log(JSON.stringify({ ok: true, [idKey]: idArg, removed: wtPath, branch, branch_removed: branchRemoved }));
+}
+
+// ---------------------------------------------------------------- seed
+
+// Session-start pointer (design spec 2026-07-26-rest-stop §5). The ONE
+// deliberate fail-OPEN surface in this file: a SessionStart hook must
+// never block or noise a session, so every failure mode — no repo, no
+// seed, unreadable file — is silence and exit 0. This subcommand only
+// reads and prints; failing open forfeits nothing the gate protects.
+function runSeedCheck() {
+  try {
+    const root = git("rev-parse", "--show-toplevel");
+    const p = path.join(root, ".lanes", "seed.md");
+    if (fs.existsSync(p)) {
+      const m = fs.readFileSync(p, "utf8").match(/^# Seed — (\d{4}-\d{2}-\d{2})/m);
+      const date = m ? m[1] : new Date(fs.statSync(p).mtime).toISOString().slice(0, 10);
+      console.log(`A rest-stop seed from ${date} exists — read .lanes/seed.md to resume.`);
+    }
+  } catch {
+    // silence — see the fail-open note above
+  }
+  process.exit(0);
 }
 
 // ---------------------------------------------------------------- CLI
