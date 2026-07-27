@@ -601,3 +601,13 @@ test("rest stop: lanes-rest-stop command contract", () => {
     assert.ok(cmdMd.includes(term), `lanes-rest-stop.md should mention ${JSON.stringify(term)}`);
   }
 });
+
+test("rest stop: guide and README tell the same story", () => {
+  const guide = read("docs/USER-GUIDE.md");
+  for (const term of ["/lanes-rest-stop", "triplog.md", ".lanes/seed.md", "A rest-stop seed from"]) {
+    assert.ok(guide.includes(term), `the guide should mention ${JSON.stringify(term)}`);
+  }
+  const readme = read("README.md");
+  assert.ok(readme.includes("/lanes-rest-stop") && readme.includes("triplog.md"),
+    "README should introduce the close-out ritual and the triplog");
+});

@@ -239,6 +239,28 @@ The top rung takes a whole feature, not a plan. What happens:
 
 Details: [`commands/lanes-highway.md`](../commands/lanes-highway.md).
 
+## Rest stops: `/lanes-rest-stop`
+
+Any rung, any time — even before `/lanes-init` (it's the one command
+that doesn't need `.lanes/config.json`; config just adds the
+Lanes-specific findings). Run it when you're wrapping up a session. It
+gathers the evidence (the session's commits, dirty and unpushed work,
+leftover task worktrees, your `whiteboard.md` if you keep one),
+proposes a summary and record updates — you confirm every one — then
+writes two artifacts and commits them locally:
+
+- **`triplog.md`** (repo root): permanent project memory, newest entry
+  first — what shipped, what was decided and why, what was left loose.
+  Come back months later and read the story top-down.
+- **`.lanes/seed.md`**: the resume pointer — where you left off, what's
+  parked, and the first action to take next time. One rolling file;
+  git history is the archive.
+
+Next session, a Lanes hook prints one line if a seed exists — "A rest-stop seed from <date> exists — read .lanes/seed.md to resume." — and you (or Claude) decide whether to pick it up. Nothing is
+auto-loaded, and the ritual never pushes.
+
+Details: [`commands/lanes-rest-stop.md`](../commands/lanes-rest-stop.md).
+
 ## What's on disk
 
 | Path | What it is |
@@ -246,6 +268,8 @@ Details: [`commands/lanes-highway.md`](../commands/lanes-highway.md).
 | `.lanes/config.json` | The one config every surface reads (schema-validated) |
 | `.lanes/state/` | Dispatch baselines the gate/audit compare against — don't edit |
 | `.lanes/worktrees/` | Per-task and per-stream isolation worktrees (git-excluded) |
+| `.lanes/seed.md` | The rolling resume seed `/lanes-rest-stop` writes (committed) |
+| `triplog.md` | Permanent session-by-session project memory (repo root, committed) |
 | `<tasks_dir>` | Emitted DELEGATE specs, one per task |
 | `<plans_dir>` | Plans and Highways stream maps |
 | `<ledger>` | Append-only pipeline history, one entry per task |

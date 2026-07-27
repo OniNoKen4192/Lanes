@@ -128,6 +128,13 @@ with the spend marked `implemented-by: claude/<model>` in the run
 report. The [User Guide](docs/USER-GUIDE.md) covers the
 ladder in detail.
 
+When a session winds down, `/lanes-rest-stop` closes it out: a guided
+ritual that summarizes the session, triages your whiteboard with you,
+surfaces loose ends, prepends the story — decisions and the why behind
+them — to a permanent `triplog.md`, and writes a resume seed that a
+session-start hook announces next time. Config-optional, works in any
+git repo, and it never pushes.
+
 ## Honesty note
 
 v1 ships **one working backend (Codex/MCP)** behind a documented seam — it
