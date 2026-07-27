@@ -7,6 +7,7 @@ import { test, describe, after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { repoRoot, makeFixtureRepo, validate, FIXTURE_SPEC } from "./helpers.mjs";
 
 const HEX40 = /^[0-9a-f]{40}$/i;
@@ -536,5 +537,41 @@ describe("doctor: failover_tiers normalized to [] when absent", () => {
     const r = validate(fx.dir, "doctor");
     assert.equal(r.status, 0);
     assert.deepEqual(r.json.failover_tiers, []);
+  });
+});
+
+describe("seed --check: pointer line when a seed exists", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("seed --check: pointer line when a seed exists", () => {
+    fs.writeFileSync(path.join(fx.dir, ".lanes", "seed.md"), "# Seed — 2026-07-26\n\n**HEAD at close:** abc1234\n");
+    const r = validate(fx.dir, "seed", "--check");
+    assert.equal(r.status, 0);
+    assert.equal(r.stdout.trim(), "A rest-stop seed from 2026-07-26 exists — read .lanes/seed.md to resume.");
+  });
+});
+
+describe("seed --check: silent and exit 0 when absent", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("seed --check: silent and exit 0 when absent", () => {
+    const r = validate(fx.dir, "seed", "--check");
+    assert.equal(r.status, 0);
+    assert.equal(r.stdout.trim(), "");
+  });
+});
+
+describe("seed --check: exit 0 outside a git repo", () => {
+  test("seed --check: exit 0 outside a git repo", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lanes-norepo-"));
+    try {
+      const r = validate(dir, "seed", "--check");
+      assert.equal(r.status, 0);
+      assert.equal(r.stdout.trim(), "");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -565,3 +565,21 @@ test("failover controller flow: commands, guide, templates agree", () => {
   assert.ok(exampleMd.includes("lanes-claude-implementer"),
     "config.example.md should say who implements under failover");
 });
+
+// ------------------------------------------------ Rest stop (2026-07-26)
+
+test("rest stop: seed pointer hook is wired", () => {
+  const hooks = JSON.parse(read("hooks/hooks.json"));
+  const pre = hooks.hooks.PreToolUse;
+  assert.ok(Array.isArray(pre) && pre.length === 1 && pre[0].matcher === "mcp__codex__codex",
+    "the PreToolUse dispatch gate must survive the SessionStart addition");
+  const session = hooks.hooks.SessionStart;
+  assert.ok(Array.isArray(session) && session.length === 1,
+    "hooks.json should carry exactly one SessionStart entry");
+  const hookCmd = session[0].hooks[0].command;
+  assert.ok(hookCmd.includes("lanes-validate.mjs") && hookCmd.includes("seed --check"),
+    "the SessionStart hook should invoke the seed --check subcommand");
+  const src = read("bin/lanes-validate.mjs");
+  assert.ok(src.includes("seed --check"),
+    "the validator usage string should document seed --check");
+});

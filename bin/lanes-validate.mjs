@@ -826,6 +826,28 @@ function runDoctor() {
   process.exit(failed ? 2 : 0);
 }
 
+// ---------------------------------------------------------------- seed
+
+// Session-start pointer (design spec 2026-07-26-rest-stop §5). The ONE
+// deliberate fail-OPEN surface in this file: a SessionStart hook must
+// never block or noise a session, so every failure mode — no repo, no
+// seed, unreadable file — is silence and exit 0. This subcommand only
+// reads and prints; failing open forfeits nothing the gate protects.
+function runSeedCheck() {
+  try {
+    const root = git("rev-parse", "--show-toplevel");
+    const p = path.join(root, ".lanes", "seed.md");
+    if (fs.existsSync(p)) {
+      const m = fs.readFileSync(p, "utf8").match(/^# Seed — (\d{4}-\d{2}-\d{2})/m);
+      const date = m ? m[1] : new Date(fs.statSync(p).mtime).toISOString().slice(0, 10);
+      console.log(`A rest-stop seed from ${date} exists — read .lanes/seed.md to resume.`);
+    }
+  } catch {
+    // silence — see the fail-open note above
+  }
+  process.exit(0);
+}
+
 // ---------------------------------------------------------------- worktree
 
 // Controller-owned per-task isolation (design spec
@@ -997,12 +1019,13 @@ try {
   else if (cmd === "audit") runAudit(argOf("--task"));
   else if (cmd === "attention") runAttention(argOf("--spec"));
   else if (cmd === "doctor") runDoctor();
+  else if (cmd === "seed" && rest[0] === "--check") runSeedCheck();
   else if (cmd === "worktree" && rest[0] === "create" && rest.includes("--stream")) runWorktreeCreateStream(argOf("--stream"), baseOf());
   else if (cmd === "worktree" && rest[0] === "create") runWorktreeCreate(argOf("--spec"), baseOf());
   else if (cmd === "worktree" && rest[0] === "remove" && rest.includes("--stream")) runWorktreeRemove(argOf("--stream"), rest.includes("--force"), "stream");
   else if (cmd === "worktree" && rest[0] === "remove") runWorktreeRemove(argOf("--task"), rest.includes("--force"), "task");
   else {
-    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | doctor | attention --spec <path> | worktree create --spec <path> [--base <ref>] | worktree create --stream <id> [--base <ref>] | worktree remove --task <id> [--force] | worktree remove --stream <id> [--force] | selftest>");
+    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | doctor | attention --spec <path> | seed --check | worktree create --spec <path> [--base <ref>] | worktree create --stream <id> [--base <ref>] | worktree remove --task <id> [--force] | worktree remove --stream <id> [--force] | selftest>");
     process.exit(1);
   }
 } catch (err) {
