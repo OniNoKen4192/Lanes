@@ -570,8 +570,21 @@ describe("seed --check: exit 0 outside a git repo", () => {
       const r = validate(dir, "seed", "--check");
       assert.equal(r.status, 0);
       assert.equal(r.stdout.trim(), "");
+      assert.equal(r.stderr.trim(), "");
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("seed --check: mtime fallback when heading unparseable", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("seed --check: mtime fallback when heading unparseable", () => {
+    fs.writeFileSync(path.join(fx.dir, ".lanes", "seed.md"), "no heading here\n");
+    const r = validate(fx.dir, "seed", "--check");
+    assert.equal(r.status, 0);
+    assert.match(r.stdout.trim(), /^A rest-stop seed from \d{4}-\d{2}-\d{2} exists — read \.lanes\/seed\.md to resume\.$/);
   });
 });

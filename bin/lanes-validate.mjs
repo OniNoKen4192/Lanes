@@ -982,7 +982,7 @@ function runWorktreeRemove(idArg, force, kind) {
 // reads and prints; failing open forfeits nothing the gate protects.
 function runSeedCheck() {
   try {
-    const root = git("rev-parse", "--show-toplevel");
+    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trimEnd();
     const p = path.join(root, ".lanes", "seed.md");
     if (fs.existsSync(p)) {
       const m = fs.readFileSync(p, "utf8").match(/^# Seed — (\d{4}-\d{2}-\d{2})/m);
