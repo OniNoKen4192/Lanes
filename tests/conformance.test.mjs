@@ -583,3 +583,21 @@ test("rest stop: seed pointer hook is wired", () => {
   assert.ok(src.includes("seed --check"),
     "the validator usage string should document seed --check");
 });
+
+test("rest stop: lanes-rest-stop command contract", () => {
+  const cmdMd = read("commands/lanes-rest-stop.md");
+  for (const term of [
+    "config-optional",
+    "confirmed by the human before it is written",
+    "Never push to a remote",
+    "triplog.md",
+    ".lanes/seed.md",
+    "# Seed — YYYY-MM-DD",
+    "HEAD at close",
+    "First action on resume",
+    ".lanes/worktrees/",
+    "whiteboard.md",
+  ]) {
+    assert.ok(cmdMd.includes(term), `lanes-rest-stop.md should mention ${JSON.stringify(term)}`);
+  }
+});
