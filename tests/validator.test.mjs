@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { execFileSync } from "node:child_process";
 import { repoRoot, makeFixtureRepo, validate, FIXTURE_SPEC } from "./helpers.mjs";
 
 const HEX40 = /^[0-9a-f]{40}$/i;
@@ -466,9 +467,40 @@ describe("config get: reports declared values", () => {
   });
 });
 
-test("config get: not a Lanes project refuses with a /lanes-init pointer", () => {
+describe("config get: from a subdirectory resolves the repo root", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("config get: from a subdirectory resolves the repo root", () => {
+    const sub = path.join(fx.dir, "src", "lib");
+    const r = validate(sub, "config", "get");
+    assert.equal(r.status, 0, `expected success from a subdirectory, got: ${r.stdout} ${r.stderr}`);
+    assert.deepEqual(r.json, {
+      trust: "manual",
+      fix_rounds: 2,
+      approval: "pilot",
+      tiers: ["alpha", "beta"],
+      failover: [],
+    });
+  });
+});
+
+test("config get: outside a git repo fails closed with a git error", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lanes-nogit-"));
+  try {
+    const r = validate(dir, "config", "get");
+    assert.notEqual(r.status, 0);
+    assert.equal(r.json.ok, false);
+    assert.equal(r.json.check, "error");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("config get: a git repo without .lanes/config.json refuses with a /lanes-init pointer", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lanes-noconfig-"));
   try {
+    execFileSync("git", ["-C", dir, "init", "-q"]);
     const r = validate(dir, "config", "get");
     assert.notEqual(r.status, 0);
     assert.ok((r.stdout + r.stderr).includes("/lanes-init"),
@@ -538,6 +570,43 @@ describe("config set: happy paths", () => {
       tiers: ["sol", "terra", "luna"],
       failover: [],
     });
+  });
+});
+
+describe("config set: from a subdirectory writes the repo-root config", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("config set: from a subdirectory writes the repo-root config", () => {
+    const sub = path.join(fx.dir, "src", "lib");
+    const r = validate(sub, "config", "set", "trust", "roundabout");
+    assert.equal(r.status, 0, `expected success from a subdirectory, got: ${r.stdout} ${r.stderr}`);
+    assert.deepEqual(r.json, { ok: true, knob: "trust", old: "manual", new: "roundabout" });
+    const cfg = JSON.parse(readConfigFile(fx.dir).toString());
+    assert.deepEqual(cfg.automation, { level: "roundabout", max_fix_rounds: 2 });
+  });
+});
+
+describe("config set: from a linked worktree writes the MAIN repo's config, not the worktree's copy", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("config set: from a linked worktree writes the MAIN repo's config, not the worktree's copy", () => {
+    const wtCreate = validate(fx.dir, "worktree", "create", "--spec", "docs/tasks/T1.md");
+    assert.equal(wtCreate.status, 0, `setup: worktree create failed: ${wtCreate.stdout} ${wtCreate.stderr}`);
+    const wt = path.join(fx.dir, ".lanes", "worktrees", "T1");
+
+    const r = validate(wt, "config", "set", "trust", "roundabout");
+    assert.equal(r.status, 0, `config set inside a worktree failed: ${r.stdout} ${r.stderr}`);
+    assert.deepEqual(r.json, { ok: true, knob: "trust", old: "manual", new: "roundabout" });
+
+    const mainCfg = JSON.parse(readConfigFile(fx.dir).toString());
+    assert.deepEqual(mainCfg.automation, { level: "roundabout", max_fix_rounds: 2 });
+
+    // The worktree's own checked-out config snapshot must be untouched —
+    // config set writes the MAIN repo's file, never the worktree's copy.
+    const wtCfg = JSON.parse(readConfigFile(wt).toString());
+    assert.equal(wtCfg.automation, undefined);
   });
 });
 

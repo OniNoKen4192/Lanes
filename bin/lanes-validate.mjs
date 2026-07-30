@@ -1022,9 +1022,13 @@ function knobValues(cfg) {
 }
 
 function runConfigGet() {
+  // Resolve the MAIN repo root — same rule gate/audit follow, so a run
+  // from a project subdirectory still finds the config, and a run inside
+  // a task worktree reads the MAIN repo's copy, never the worktree's own
+  // checked-out snapshot (design spec 2026-07-29-lanes-config).
   // loadConfig throws on missing/invalid config — the top-level catch
   // reports it (existing refusal text, /lanes-init or migration pointer).
-  console.log(JSON.stringify(knobValues(loadConfig())));
+  console.log(JSON.stringify(knobValues(loadConfig(mainRepoRoot()))));
 }
 
 function runConfigSet(knob, value) {
@@ -1033,10 +1037,14 @@ function runConfigSet(knob, value) {
   }
   if (value === undefined) configError(`usage: config set ${knob} <value>`);
 
+  // Same root rule as config get — never the cwd, never a worktree's
+  // own checked-out copy (design spec 2026-07-29-lanes-config).
+  const root = mainRepoRoot();
+
   // Normalized view for the old value + the existing refusals on a
   // missing/invalid config (fail closed: a broken config cannot be
   // "fixed" through this path).
-  const before = knobValues(loadConfig());
+  const before = knobValues(loadConfig(root));
   const old = before[knob.replace("-", "_")];
 
   // Parse the value per knob (spec §3 step 2) — before any mutation.
@@ -1056,7 +1064,7 @@ function runConfigSet(knob, value) {
   // Mutate the RAW file, not the normalized view — loadConfig's
   // defaults must not leak into the file, except deliberately when
   // setting a knob creates the automation block (spec §3).
-  const p = path.join(".", ".lanes", "config.json");
+  const p = path.join(root, ".lanes", "config.json");
   const raw = JSON.parse(fs.readFileSync(p, "utf8"));
   if (knob === "trust" || knob === "fix-rounds") {
     const block = raw.automation ?? { level: "manual", max_fix_rounds: 2 };

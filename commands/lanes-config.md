@@ -6,6 +6,7 @@ description: >
   `failover` (backend.failover_tiers). No argument shows current
   values; `<knob> <value>` sets one — validated before the write,
   applied immediately, fail-closed.
+argument-hint: [<knob> <value>]
 ---
 
 # /lanes-config [<knob> <value>] — the operational knobs
