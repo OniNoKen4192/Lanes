@@ -478,6 +478,111 @@ test("config get: not a Lanes project refuses with a /lanes-init pointer", () =>
   }
 });
 
+function readConfigFile(dir) {
+  return fs.readFileSync(path.join(dir, ".lanes", "config.json"));
+}
+
+describe("config set: happy paths", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("set trust creates the automation block with defaults", () => {
+    const r = validate(fx.dir, "config", "set", "trust", "roundabout");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json, { ok: true, knob: "trust", old: "manual", new: "roundabout" });
+    const cfg = JSON.parse(readConfigFile(fx.dir).toString());
+    assert.deepEqual(cfg.automation, { level: "roundabout", max_fix_rounds: 2 });
+  });
+
+  test("set fix-rounds updates the existing block", () => {
+    const r = validate(fx.dir, "config", "set", "fix-rounds", "3");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json, { ok: true, knob: "fix-rounds", old: 2, new: 3 });
+    const cfg = JSON.parse(readConfigFile(fx.dir).toString());
+    assert.deepEqual(cfg.automation, { level: "roundabout", max_fix_rounds: 3 });
+  });
+
+  test("set approval automated", () => {
+    const r = validate(fx.dir, "config", "set", "approval", "automated");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json, { ok: true, knob: "approval", old: "pilot", new: "automated" });
+  });
+
+  test("set tiers splits on commas and trims", () => {
+    const r = validate(fx.dir, "config", "set", "tiers", "sol, terra ,luna");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json.new, ["sol", "terra", "luna"]);
+    assert.deepEqual(r.json.old, ["alpha", "beta"]);
+  });
+
+  test("set failover declares the tiers", () => {
+    const r = validate(fx.dir, "config", "set", "failover", "opus,sonnet");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json, { ok: true, knob: "failover", old: [], new: ["opus", "sonnet"] });
+  });
+
+  test("set failover none clears to []", () => {
+    const r = validate(fx.dir, "config", "set", "failover", "none");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json, { ok: true, knob: "failover", old: ["opus", "sonnet"], new: [] });
+    const cfg = JSON.parse(readConfigFile(fx.dir).toString());
+    assert.deepEqual(cfg.backend.failover_tiers, []);
+  });
+
+  test("get round-trips the set values", () => {
+    const r = validate(fx.dir, "config", "get");
+    assert.deepEqual(r.json, {
+      trust: "roundabout",
+      fix_rounds: 3,
+      approval: "automated",
+      tiers: ["sol", "terra", "luna"],
+      failover: [],
+    });
+  });
+});
+
+describe("config set: refusals leave the file byte-identical", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  // [label, knob, value, expected reason substring]
+  const REFUSALS = [
+    ["unknown knob", "widget", "x", "unknown knob 'widget'"],
+    ["bad trust value", "trust", "yolo", "automation.level"],
+    ["legacy conveyor names the rename", "trust", "conveyor", 'renamed to "roundabout"'],
+    ["non-integer fix-rounds", "fix-rounds", "three", "integer >= 1"],
+    ["fractional fix-rounds", "fix-rounds", "3.5", "integer >= 1"],
+    ["zero fix-rounds", "fix-rounds", "0", "integer >= 1"],
+    ["bad approval", "approval", "yolo", "approval_mode"],
+    ["empty tiers", "tiers", "", "empty"],
+    ["empty list entry", "tiers", "sol,,luna", "empty"],
+    ["missing value", "trust", undefined, "usage"],
+  ];
+
+  for (const [label, knob, value, want] of REFUSALS) {
+    test(`config set refusal: ${label}`, () => {
+      const before = readConfigFile(fx.dir);
+      const args = value === undefined
+        ? ["config", "set", knob]
+        : ["config", "set", knob, value];
+      const r = validate(fx.dir, ...args);
+      assert.equal(r.status, 1);
+      assert.equal(r.json.ok, false);
+      assert.ok(r.json.reason.includes(want),
+        `expected reason to include ${JSON.stringify(want)}, got: ${r.json.reason}`);
+      assert.ok(before.equals(readConfigFile(fx.dir)),
+        "a refused set must leave the file byte-identical");
+    });
+  }
+
+  test("config set refusal: unknown knob lists the five knobs", () => {
+    const r = validate(fx.dir, "config", "set", "widget", "x");
+    for (const knob of ["trust", "fix-rounds", "approval", "tiers", "failover"]) {
+      assert.ok(r.json.reason.includes(knob), `refusal should list knob ${knob}`);
+    }
+  });
+});
+
 describe("gate: highways level accepted", () => {
   const fx = makeFixtureRepo({ patchConfig: (c) => {
     c.automation = { level: "highways" };

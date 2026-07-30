@@ -1027,6 +1027,56 @@ function runConfigGet() {
   console.log(JSON.stringify(knobValues(loadConfig())));
 }
 
+function runConfigSet(knob, value) {
+  if (!KNOBS.includes(knob)) {
+    configError(`unknown knob '${knob}' — knobs are: ${KNOBS.join(", ")}`);
+  }
+  if (value === undefined) configError(`usage: config set ${knob} <value>`);
+
+  // Normalized view for the old value + the existing refusals on a
+  // missing/invalid config (fail closed: a broken config cannot be
+  // "fixed" through this path).
+  const before = knobValues(loadConfig());
+  const old = before[knob.replace("-", "_")];
+
+  // Parse the value per knob (spec §3 step 2) — before any mutation.
+  let parsed = value;
+  if (knob === "fix-rounds") {
+    if (!/^\d+$/.test(value)) configError(`'fix-rounds' must be an integer >= 1, got ${JSON.stringify(value)}`);
+    parsed = Number(value);
+  } else if (knob === "tiers" || knob === "failover") {
+    parsed = knob === "failover" && value === "none"
+      ? []
+      : value.split(",").map((s) => s.trim());
+    if (parsed.some((s) => s === "")) {
+      configError(`'${knob}' must be a comma-separated list with no empty entries, got ${JSON.stringify(value)}`);
+    }
+  }
+
+  // Mutate the RAW file, not the normalized view — loadConfig's
+  // defaults must not leak into the file, except deliberately when
+  // setting a knob creates the automation block (spec §3).
+  const p = path.join(".", ".lanes", "config.json");
+  const raw = JSON.parse(fs.readFileSync(p, "utf8"));
+  if (knob === "trust" || knob === "fix-rounds") {
+    const block = raw.automation ?? { level: "manual", max_fix_rounds: 2 };
+    if (knob === "trust") block.level = parsed;
+    else block.max_fix_rounds = parsed;
+    raw.automation = block;
+  } else if (knob === "approval") {
+    raw.backend.approval_mode = parsed;
+  } else if (knob === "tiers") {
+    raw.backend.tiers = parsed;
+  } else {
+    raw.backend.failover_tiers = parsed;
+  }
+
+  const errors = validateConfig(raw);
+  if (errors.length) configError(errors.join("; ")); // file untouched
+  fs.writeFileSync(p, JSON.stringify(raw, null, 2) + "\n");
+  console.log(JSON.stringify({ ok: true, knob, old, new: parsed }));
+}
+
 // ---------------------------------------------------------------- CLI
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -1053,6 +1103,7 @@ try {
   else if (cmd === "doctor") runDoctor();
   else if (cmd === "seed" && rest[0] === "--check") runSeedCheck();
   else if (cmd === "config" && rest[0] === "get") runConfigGet();
+  else if (cmd === "config" && rest[0] === "set") runConfigSet(rest[1], rest[2]);
   else if (cmd === "worktree" && rest[0] === "create" && rest.includes("--stream")) runWorktreeCreateStream(argOf("--stream"), baseOf());
   else if (cmd === "worktree" && rest[0] === "create") runWorktreeCreate(argOf("--spec"), baseOf());
   else if (cmd === "worktree" && rest[0] === "remove" && rest.includes("--stream")) runWorktreeRemove(argOf("--stream"), rest.includes("--force"), "stream");
