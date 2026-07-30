@@ -998,6 +998,35 @@ function runSeedCheck() {
   process.exit(0);
 }
 
+// ---------------------------------------------------------------- config knobs
+
+// The five operational knobs /lanes-config exposes (design spec
+// 2026-07-29-lanes-config §2-3). `config set` is the ONLY write path
+// for them — validated with validateConfig before the write,
+// fail-closed: any refusal leaves the file untouched.
+const KNOBS = ["trust", "fix-rounds", "approval", "tiers", "failover"];
+
+function configError(reason) {
+  console.log(JSON.stringify({ ok: false, check: "config", reason }));
+  process.exit(1);
+}
+
+function knobValues(cfg) {
+  return {
+    trust: cfg.automation.level,
+    fix_rounds: cfg.automation.max_fix_rounds,
+    approval: cfg.backend.approval_mode,
+    tiers: cfg.backend.tiers,
+    failover: cfg.backend.failover_tiers,
+  };
+}
+
+function runConfigGet() {
+  // loadConfig throws on missing/invalid config — the top-level catch
+  // reports it (existing refusal text, /lanes-init or migration pointer).
+  console.log(JSON.stringify(knobValues(loadConfig())));
+}
+
 // ---------------------------------------------------------------- CLI
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -1023,12 +1052,13 @@ try {
   else if (cmd === "attention") runAttention(argOf("--spec"));
   else if (cmd === "doctor") runDoctor();
   else if (cmd === "seed" && rest[0] === "--check") runSeedCheck();
+  else if (cmd === "config" && rest[0] === "get") runConfigGet();
   else if (cmd === "worktree" && rest[0] === "create" && rest.includes("--stream")) runWorktreeCreateStream(argOf("--stream"), baseOf());
   else if (cmd === "worktree" && rest[0] === "create") runWorktreeCreate(argOf("--spec"), baseOf());
   else if (cmd === "worktree" && rest[0] === "remove" && rest.includes("--stream")) runWorktreeRemove(argOf("--stream"), rest.includes("--force"), "stream");
   else if (cmd === "worktree" && rest[0] === "remove") runWorktreeRemove(argOf("--task"), rest.includes("--force"), "task");
   else {
-    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | doctor | attention --spec <path> | seed --check | worktree create --spec <path> [--base <ref>] | worktree create --stream <id> [--base <ref>] | worktree remove --task <id> [--force] | worktree remove --stream <id> [--force] | selftest>");
+    console.error("usage: lanes-validate.mjs <gate --spec <path> | audit --task <id> | doctor | attention --spec <path> | seed --check | config get | config set <knob> <value> | worktree create --spec <path> [--base <ref>] | worktree create --stream <id> [--base <ref>] | worktree remove --task <id> [--force] | worktree remove --stream <id> [--force] | selftest>");
     process.exit(1);
   }
 } catch (err) {

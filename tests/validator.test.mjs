@@ -429,6 +429,55 @@ describe("doctor: absent automation block reports manual", () => {
   });
 });
 
+describe("config get: normalized defaults on a minimal config", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("config get: normalized defaults on a minimal config", () => {
+    const r = validate(fx.dir, "config", "get");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json, {
+      trust: "manual",
+      fix_rounds: 2,
+      approval: "pilot",
+      tiers: ["alpha", "beta"],
+      failover: [],
+    });
+  });
+});
+
+describe("config get: reports declared values", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.automation = { level: "roundabout", max_fix_rounds: 3 };
+    c.backend.failover_tiers = ["opus", "sonnet"];
+  } });
+  after(() => fx.cleanup());
+
+  test("config get: reports declared values", () => {
+    const r = validate(fx.dir, "config", "get");
+    assert.equal(r.status, 0);
+    assert.deepEqual(r.json, {
+      trust: "roundabout",
+      fix_rounds: 3,
+      approval: "pilot",
+      tiers: ["alpha", "beta"],
+      failover: ["opus", "sonnet"],
+    });
+  });
+});
+
+test("config get: not a Lanes project refuses with a /lanes-init pointer", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lanes-noconfig-"));
+  try {
+    const r = validate(dir, "config", "get");
+    assert.notEqual(r.status, 0);
+    assert.ok((r.stdout + r.stderr).includes("/lanes-init"),
+      `expected a /lanes-init pointer, got: ${r.stdout} ${r.stderr}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 describe("gate: highways level accepted", () => {
   const fx = makeFixtureRepo({ patchConfig: (c) => {
     c.automation = { level: "highways" };
