@@ -42,6 +42,9 @@ test("§5.1 plugin manifest", () => {
     typeof manifest.description === "string" && manifest.description.trim().length > 0,
     "manifest description should be non-empty"
   );
+  const marketplace = JSON.parse(read(".claude-plugin/marketplace.json"));
+  assert.equal(marketplace.plugins[0].version, manifest.version,
+    "marketplace.json and plugin.json must carry the same version — bump both (docs/RELEASING.md)");
 });
 
 // ------------------------------------------------------------- §5.2
