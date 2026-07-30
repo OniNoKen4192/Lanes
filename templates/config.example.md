@@ -76,6 +76,9 @@ Resolved from your package manifest (package.json scripts) at init;
   validated (they evolve with the platform); a bad alias fails the
   Agent dispatch and the task parks.
 
+Flip `approval_mode`, `tiers`, and `failover_tiers` any time with
+`/lanes-config` — the validated write path.
+
 ## `routing`
 
 Patterns in both lists follow `docs/PATH-MATCHING.md` (normative): `*`
@@ -157,6 +160,9 @@ ledger history is evidence you consult, not a mechanism.
 The safety floor holds at every level: security-routed and
 attention-matched work never runs unattended, REJECT is always a human
 decision, and nothing is ever pushed to a remote.
+
+Flip `level` and `max_fix_rounds` with `/lanes-config` (e.g.
+`/lanes-config trust roundabout`) rather than hand-editing.
 
 ## Migrating from the legacy `.lanes/config.md`
 

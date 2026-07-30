@@ -112,6 +112,10 @@ earned your trust, you declare a higher rung in `.lanes/config.json`
 | `roundabout` | Approve the plan | The whole task graph, via `/lanes-run <plan>` |
 | `highways` | Approve one stream map | Multi-stream builds with parallel planning and an integration review, via `/lanes-highway <feature>` |
 
+Flip the rung — and the other operational knobs (fix-round cap,
+approval mode, tier lists) — with `/lanes-config`, e.g. `/lanes-config
+trust roundabout`. It validates before writing and applies immediately.
+
 Trust is declared, not earned by machinery — you flip the setting; the
 ledger history is evidence you consult, not a mechanism. A safety floor
 holds at every rung: security-routed and `routing.attention`-matched

@@ -177,6 +177,12 @@ The commands enforce their rung: `/lanes-run` refuses below `roundabout`,
 this once" at the prompt — the config declaration is the only
 authorization.
 
+You flip rungs (and the other operational knobs — the fix-round cap,
+the backend approval mode, the tier lists) with `/lanes-config`:
+`/lanes-config` alone shows current values, `/lanes-config trust
+roundabout` sets one. Every write is schema-validated before it lands;
+a refused value leaves the file untouched.
+
 ## The roundabout: `/lanes-run <plan>`
 
 Point it at an approved, lane-tagged plan. It emits specs if they're

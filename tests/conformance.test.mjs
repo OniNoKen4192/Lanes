@@ -637,3 +637,30 @@ test("rest stop: guide and README tell the same story", () => {
   assert.ok(readme.includes("/lanes-rest-stop") && readme.includes("triplog.md"),
     "README should introduce the close-out ritual and the triplog");
 });
+
+// ------------------------------------------------ /lanes-config (2026-07-29)
+
+test("config command: structure and hard rules", () => {
+  const cmd = read("commands/lanes-config.md");
+  assert.ok(cmd.startsWith("---\n"), "lanes-config.md should start with a frontmatter fence");
+  for (const knob of ["trust", "fix-rounds", "approval", "tiers", "failover"]) {
+    assert.ok(cmd.includes("`" + knob + "`"), `lanes-config.md should name the ${knob} knob`);
+  }
+  assert.ok(cmd.includes("config get") && cmd.includes("config set"),
+    "lanes-config.md should call the config subcommand for both read and write");
+  assert.ok(cmd.includes("ONLY write path"),
+    "lanes-config.md should state the only-write-path rule");
+  assert.ok(cmd.includes("never ask for confirmation"),
+    "lanes-config.md should state immediate apply");
+  assert.ok(cmd.includes("pre-authorization to"),
+    "lanes-config.md should state the failover quota consequence");
+});
+
+test("config command: docs teach /lanes-config", () => {
+  assert.ok(read("README.md").includes("/lanes-config"),
+    "README should mention /lanes-config");
+  assert.ok(read("docs/USER-GUIDE.md").includes("/lanes-config"),
+    "the user guide should mention /lanes-config");
+  assert.ok(read("templates/config.example.md").includes("/lanes-config"),
+    "config.example.md should point at /lanes-config");
+});
