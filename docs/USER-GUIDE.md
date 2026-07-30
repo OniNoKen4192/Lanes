@@ -45,7 +45,7 @@ for the delegated ones.
   the run continues elsewhere. You review parks afterward.
 - **The trust ladder.** How much of the pipeline runs unattended is a
   per-project declaration in `.lanes/config.json`:
-  `manual → verdicts → conveyor → highways`. You climb it when a
+  `manual → verdicts → roundabout → highways`. You climb it when a
   project's history has earned your trust — nothing climbs it for you.
 
 ## Install
@@ -149,8 +149,8 @@ everything below it.
 |---|---|---|---|
 | `manual` | Everything (the default) | Nothing | — |
 | `verdicts` | Plan, emit, dispatch each spec | Verdict handling: APPROVE → merge + clean up; FIX → re-dispatch up to `max_fix_rounds`, then park | — |
-| `conveyor` | Approve the plan | The whole task graph: emit → dispatch → review → verdict → merge, serially | `/lanes-run <plan>` |
-| `highways` | Approve one stream map | Multi-stream: per-stream planning, concurrent conveyors, integration + review doc | `/lanes-highway <feature>` |
+| `roundabout` | Approve the plan | The whole task graph: emit → dispatch → review → verdict → merge, serially | `/lanes-run <plan>` |
+| `highways` | Approve one stream map | Multi-stream: per-stream planning, concurrent roundabouts, integration + review doc | `/lanes-highway <feature>` |
 
 **The safety floor holds at every rung.** No level, ever:
 
@@ -172,12 +172,12 @@ parks for you in every unattended run, with the category in the park
 reason. Unlike `security_routed` it doesn't force a task KEEP — it just
 waits for you.
 
-The commands enforce their rung: `/lanes-run` refuses below `conveyor`,
+The commands enforce their rung: `/lanes-run` refuses below `roundabout`,
 `/lanes-highway` refuses below `highways`, and neither accepts "just
 this once" at the prompt — the config declaration is the only
 authorization.
 
-## The conveyor: `/lanes-run <plan>`
+## The roundabout: `/lanes-run <plan>`
 
 Point it at an approved, lane-tagged plan. It emits specs if they're
 missing, then walks the Task/Lane Map serially in dependency order:
@@ -185,7 +185,7 @@ DELEGATE tasks through the full worktree → implementer → reviewer →
 verdict cycle; ordinary KEEP tasks inline via the normal superpowers
 loop; security-routed and attention-matched tasks parked on arrival.
 
-A task parks — and everything downstream of it leaves the conveyor
+A task parks — and everything downstream of it leaves the roundabout
 while the rest continues — on any of: reviewer REJECT, FIX rounds
 exhausted, implementer BLOCKED, backend failure, rate limits after
 every tier fell back, security-routed arrival, attention-category
@@ -223,7 +223,7 @@ The top rung takes a whole feature, not a plan. What happens:
    lane-tagged plan (in parallel); a plan check verifies every task
    stays inside its stream's territory; streams then execute
    concurrently, each on its own `highway/<stream-id>` branch, each
-   running the same conveyor cycle as `/lanes-run`.
+   running the same roundabout cycle as `/lanes-run`.
 4. **Integration.** Completed streams merge into a `highway/integration`
    branch in dependency order — a merge conflict parks the stream, it
    never gets hand-resolved unattended — and a frontier integration
@@ -298,7 +298,7 @@ message is the troubleshooting guide. The common ones:
   when every configured tier is exhausted, the task parks rather than
   hammering the backend — unless `backend.failover_tiers` is declared,
   in which case it re-dispatches once to `lanes-claude-implementer`
-  (see the conveyor section).
+  (see the roundabout section).
 - **"worktree already exists" / leftover parked worktrees.** Inspect,
   then dispose:
   `worktree remove --task <id>` (add `--force` to discard uncommitted
@@ -311,7 +311,7 @@ message is the troubleshooting guide. The common ones:
 | [`templates/config.example.md`](../templates/config.example.md) | Every config field, with a worked example |
 | [`templates/ROUTING.md`](../templates/ROUTING.md) | The routing authority: what may be delegated |
 | [`skills/lanes/SKILL.md`](../skills/lanes/SKILL.md) | The whole pipeline on one screen (what Claude follows) |
-| [`commands/lanes-run.md`](../commands/lanes-run.md) | Conveyor procedure, park semantics, hard rules |
+| [`commands/lanes-run.md`](../commands/lanes-run.md) | Roundabout procedure, park semantics, hard rules |
 | [`commands/lanes-highway.md`](../commands/lanes-highway.md) | Highways procedure, stream maps, review doc contents |
 | [`docs/PATH-MATCHING.md`](PATH-MATCHING.md) | Glob semantics for every routing pattern |
 | `docs/superpowers/specs/` | The dated design specs behind each behavior |

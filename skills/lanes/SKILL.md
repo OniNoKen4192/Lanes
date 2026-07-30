@@ -52,7 +52,7 @@ ever inserts itself into the DELEGATE-routed tasks' path.
 
 When the project's `.lanes/config.json` declares an `automation.level`
 above `"manual"`, the handoffs between these stages run unattended per
-the Roundabout trust ladder — see Section C item 6, `/lanes-run`, and
+the trust ladder — see Section C item 6, `/lanes-run`, and
 (at the top rung) `/lanes-highway`.
 
 ## Section B — the planning hook (load-bearing)
@@ -117,18 +117,18 @@ Once the plan is approved:
 5. Respect `Depends on` ordering throughout: don't dispatch a task whose
    dependency hasn't landed, whichever lane either one is in.
 
-6. **Automation (Roundabout).** All of the above assumes
+6. **Automation (trust ladder).** All of the above assumes
    `automation.level: "manual"` (or no `automation` block) — every
    handoff is yours. At `"verdicts"`, handle reviewer verdicts
    unattended: APPROVE → commit in the worktree, merge, remove; FIX →
    apply the delta spec and re-dispatch, up to
    `automation.max_fix_rounds` rounds, then park for the human; REJECT
-   → always stop for the human. At `"conveyor"`, run
+   → always stop for the human. At `"roundabout"`, run
    `/lanes-run <plan>` instead of stepping through items 1–5 manually —
    it drives the whole Task/Lane Map and parks anything needing a
    human.
    At `"highways"`, `/lanes-highway <feature>` adds the level above
-   the conveyor: stream decomposition with one human gate (the stream
+   the roundabout: stream decomposition with one human gate (the stream
    map), unattended per-stream planning via `lanes-stream-planner`,
    concurrent stream execution, and a `highway/integration` branch +
    review document — the working branch is never touched. In any

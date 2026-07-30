@@ -4,7 +4,7 @@ description: >
   Declared-failover implementer: writes the code for a single Lanes
   spec ITSELF when the DELEGATE backend is rate-limited and the project
   declares `backend.failover_tiers` (`.lanes/config.json`). Dispatched
-  ONLY by a Lanes run controller (conveyor or highway walk) via the
+  ONLY by a Lanes run controller (roundabout or highway walk) via the
   Agent tool with an explicit `model:` override — never first-line
   dispatch, never user-invoked, never for exploratory work,
   architectural decisions, or any task without a runnable acceptance

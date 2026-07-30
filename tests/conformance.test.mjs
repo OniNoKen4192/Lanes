@@ -398,12 +398,12 @@ test("roundabout: /lanes-run command structure", () => {
   const cmd = read("commands/lanes-run.md");
   assert.ok(cmd.startsWith("---\n"), "lanes-run.md should start with a frontmatter fence");
   for (const term of [
-    "conveyor", "max_fix_rounds", "REJECT", "BLOCKED", "BACKEND_FAILURE",
+    "roundabout", "max_fix_rounds", "REJECT", "BLOCKED", "BACKEND_FAILURE",
     "RATE_LIMITED", "security-routed", "park", "worktree create", "Task/Lane Map",
   ]) {
     assert.ok(cmd.includes(term), `lanes-run.md should mention ${JSON.stringify(term)}`);
   }
-  assert.ok(!cmd.includes("git push"), "the conveyor must never push to a remote");
+  assert.ok(!cmd.includes("git push"), "the roundabout walk must never push to a remote");
 });
 
 test("roundabout: SKILL.md references the automation ladder", () => {
@@ -419,9 +419,32 @@ test("roundabout: config examples document automation", () => {
   assert.equal(json.automation.max_fix_rounds, 2);
   const md = read("templates/config.example.md");
   assert.ok(md.includes("## `automation`"), "config.example.md should have an automation section");
-  for (const term of ["manual", "verdicts", "conveyor", "max_fix_rounds"]) {
+  for (const term of ["manual", "verdicts", "roundabout", "max_fix_rounds"]) {
     assert.ok(md.includes(term), `config.example.md should document ${JSON.stringify(term)}`);
   }
+});
+
+test("rename: no live surface still says 'conveyor'", () => {
+  // Historical records (docs/superpowers/**, whiteboard.md, RELEASING.md)
+  // and this test file keep their mentions; every operative surface must not —
+  // except bin/lanes-validate.mjs, which intentionally still names "conveyor"
+  // as the detection string for its legacy-value migration hint.
+  const offenders = [];
+  const scan = (rel) => {
+    for (const entry of fs.readdirSync(path.join(repoRoot, rel), { withFileTypes: true })) {
+      const relPath = `${rel}/${entry.name}`;
+      if (entry.isDirectory()) scan(relPath);
+      else if (relPath === "bin/lanes-validate.mjs") continue;
+      else if (/conveyor/i.test(fs.readFileSync(path.join(repoRoot, relPath), "utf8"))) {
+        offenders.push(relPath);
+      }
+    }
+  };
+  for (const dir of ["bin", "commands", "agents", "skills", "templates", "hooks"]) scan(dir);
+  for (const file of ["README.md", "docs/USER-GUIDE.md"]) {
+    if (/conveyor/i.test(read(file))) offenders.push(file);
+  }
+  assert.deepEqual(offenders, [], `live surfaces still mention 'conveyor': ${offenders.join(", ")}`);
 });
 
 // -------------------------------------------------- Highways (2026-07-25)
@@ -455,7 +478,7 @@ test("highways: stream planner agent plans only", () => {
 
 test("highways: lanes-run accepts both levels and parks attention", () => {
   const cmd = read("commands/lanes-run.md");
-  assert.ok(cmd.includes('"conveyor"') && cmd.includes('"highways"'),
+  assert.ok(cmd.includes('"roundabout"') && cmd.includes('"highways"'),
     "lanes-run.md precondition should name both accepted levels");
   assert.ok(cmd.includes("attention --spec"), "lanes-run.md should call the attention subcommand");
   assert.ok(cmd.includes("Security-routed or attention-matched KEEP task"),
@@ -485,7 +508,7 @@ test("user guide: load-bearing facts stay true", () => {
   const guide = read("docs/USER-GUIDE.md");
 
   // The ladder, in order, and its declaration surface.
-  assert.ok(guide.includes("`manual → verdicts → conveyor → highways`"),
+  assert.ok(guide.includes("`manual → verdicts → roundabout → highways`"),
     "the guide should state the four-rung ladder in order");
   for (const term of ["automation", "max_fix_rounds", ".lanes/config.json"]) {
     assert.ok(guide.includes(term), `the guide should mention ${JSON.stringify(term)}`);

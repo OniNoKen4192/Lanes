@@ -351,7 +351,7 @@ describe("doctor: clean fixture is ok", () => {
 
 describe("gate: valid automation block accepted", () => {
   const fx = makeFixtureRepo({ patchConfig: (c) => {
-    c.automation = { level: "conveyor", max_fix_rounds: 3 };
+    c.automation = { level: "roundabout", max_fix_rounds: 3 };
   } });
   after(() => fx.cleanup());
 
@@ -376,6 +376,20 @@ describe("gate: bad automation level refused", () => {
   });
 });
 
+describe("gate: legacy conveyor level names the rename", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => {
+    c.automation = { level: "conveyor" };
+  } });
+  after(() => fx.cleanup());
+
+  test("gate: legacy conveyor level names the rename", () => {
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.notEqual(r.status, 0);
+    assert.ok(r.json.reason.includes('renamed to "roundabout"'),
+      `expected the conveyor→roundabout rename hint, got: ${r.json.reason}`);
+  });
+});
+
 describe("gate: unknown automation key refused", () => {
   const fx = makeFixtureRepo({ patchConfig: (c) => {
     c.automation = { level: "manual", turbo: true };
@@ -392,13 +406,13 @@ describe("gate: unknown automation key refused", () => {
 
 describe("doctor: reports declared automation level", () => {
   const fx = makeFixtureRepo({ patchConfig: (c) => {
-    c.automation = { level: "conveyor" };
+    c.automation = { level: "roundabout" };
   } });
   after(() => fx.cleanup());
 
   test("doctor: reports declared automation level", () => {
     const r = validate(fx.dir, "doctor");
-    assert.equal(r.json.automation.level, "conveyor");
+    assert.equal(r.json.automation.level, "roundabout");
     assert.equal(r.json.automation.max_fix_rounds, 2);
   });
 });

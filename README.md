@@ -109,7 +109,7 @@ earned your trust, you declare a higher rung in `.lanes/config.json`
 |---|---|---|
 | `manual` | Everything | Nothing |
 | `verdicts` | Plan, emit, dispatch | Verdict handling (APPROVE → merge; FIX → re-dispatch up to a cap) |
-| `conveyor` | Approve the plan | The whole task graph, via `/lanes-run <plan>` |
+| `roundabout` | Approve the plan | The whole task graph, via `/lanes-run <plan>` |
 | `highways` | Approve one stream map | Multi-stream builds with parallel planning and an integration review, via `/lanes-highway <feature>` |
 
 Trust is declared, not earned by machinery — you flip the setting; the

@@ -1,13 +1,13 @@
 ---
 description: >
-  Run the Roundabout conveyor: drive an approved, lane-tagged plan
+  Run the roundabout: drive an approved, lane-tagged plan
   end-to-end unattended — emit, dispatch, review, act on verdicts,
   merge — parking anything that needs a human. Requires
-  `.lanes/config.json` to declare `automation.level: "conveyor"`.
+  `.lanes/config.json` to declare `automation.level: "roundabout"`.
 argument-hint: <path-to-approved-plan>
 ---
 
-# /lanes-run <plan> — the conveyor
+# /lanes-run <plan> — the roundabout
 
 Argument: path to an approved plan carrying a Task/Lane Map. Behavior
 spec: `docs/superpowers/specs/2026-07-25-roundabout-automation-design.md`
@@ -18,7 +18,7 @@ immutable-spec amendments all apply to every dispatch exactly as always.
 ## Preconditions (refuse, naming the unmet one)
 
 1. `.lanes/config.json` loads clean and `automation.level` is
-   `"conveyor"` or `"highways"`. At `"manual"` or `"verdicts"` refuse —
+   `"roundabout"` or `"highways"`. At `"manual"` or `"verdicts"` refuse —
    the declared trust level IS the authorization to run unattended; do
    not offer to proceed anyway.
 2. The plan file exists and contains a Task/Lane Map table
@@ -60,7 +60,7 @@ immutable-spec amendments all apply to every dispatch exactly as always.
      category) → park it immediately, naming the list or category.
      Security-routed and attention-matched work never runs unattended.
 3. **Park, never halt.** A parked task — and every task downstream of
-   it — leaves the conveyor; the walk continues with every task that
+   it — leaves the roundabout; the walk continues with every task that
    does not depend on it. Park on: reviewer REJECT, FIX rounds
    exhausted, implementer BLOCKED, implementer BACKEND_FAILURE,
    RATE_LIMITED after tier fallback has exhausted every configured
@@ -125,7 +125,7 @@ non-empty, the task does not park. Spec:
   a REJECT.
 - Never push to a remote. Merges stay local; publishing is the human's
   decision.
-- Never run at `automation.level` below `"conveyor"` — including "just
+- Never run at `automation.level` below `"roundabout"` — including "just
   this once" at the human's live prompting; the config declaration is
   the only authorization this command accepts.
 - Failover never engages when `backend.failover_tiers` is absent or

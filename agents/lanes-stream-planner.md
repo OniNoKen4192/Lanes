@@ -4,7 +4,7 @@ description: >
   Plans ONE Highways stream: takes a stream-map entry (mission,
   territory, depends-on, interfaces) and writes that stream's
   lane-tagged implementation plan. Planning only — this agent never
-  implements, dispatches, emits specs, or runs a conveyor. Use only
+  implements, dispatches, emits specs, or runs a roundabout. Use only
   from /lanes-highway.
 tools: Read, Grep, Glob, Write, Bash
 ---

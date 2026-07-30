@@ -2,7 +2,7 @@
 description: >
   Run a Highways orchestration: decompose a feature into independent
   work streams, get ONE human approval (the stream map), then plan each
-  stream with a frontier subagent and drive every stream's conveyor
+  stream with a frontier subagent and drive every stream's roundabout
   concurrently — landing everything on a highway/integration branch
   plus an after-run review document. Never touches the working branch.
   Requires `.lanes/config.json` to declare
@@ -15,7 +15,7 @@ argument-hint: <feature-brief-or-path>
 Argument: the feature to build — inline prose or a path to a brief/spec
 file. Behavior spec:
 `docs/superpowers/specs/2026-07-25-highways-streams-design.md` §3–§7.
-Like the conveyor, this command changes who turns the crank — never
+Like the roundabout, this command changes who turns the crank — never
 what the machinery enforces: scope gate, audit, worktree isolation, and
 immutable-spec amendments apply to every dispatch exactly as always.
 

@@ -147,8 +147,10 @@ function validateConfig(cfg) {
   if (cfg.backend.approval_mode !== "pilot" && cfg.backend.approval_mode !== "automated") {
     errors.push(`'backend.approval_mode' must be "pilot" or "automated", got ${JSON.stringify(cfg.backend.approval_mode)}`);
   }
-  if (cfg.automation && !["manual", "verdicts", "conveyor", "highways"].includes(cfg.automation.level)) {
-    errors.push(`'automation.level' must be "manual", "verdicts", "conveyor", or "highways", got ${JSON.stringify(cfg.automation.level)}`);
+  if (cfg.automation && !["manual", "verdicts", "roundabout", "highways"].includes(cfg.automation.level)) {
+    errors.push(cfg.automation.level === "conveyor"
+      ? `'automation.level' "conveyor" was renamed to "roundabout" — edit .lanes/config.json and set automation.level to "roundabout"`
+      : `'automation.level' must be "manual", "verdicts", "roundabout", or "highways", got ${JSON.stringify(cfg.automation.level)}`);
   }
   if (cfg.backend.tiers.length === 0) errors.push("'backend.tiers' must be a non-empty array");
   for (const key of ["test", "acceptance_runner"]) {
@@ -316,14 +318,15 @@ const SCHEMA_VECTORS = [
   }, "route_map"],
   ["automation manual", (c) => { c.automation = { level: "manual" }; }, null],
   ["automation verdicts", (c) => { c.automation = { level: "verdicts" }; }, null],
-  ["automation conveyor with cap", (c) => { c.automation = { level: "conveyor", max_fix_rounds: 3 }; }, null],
+  ["automation roundabout with cap", (c) => { c.automation = { level: "roundabout", max_fix_rounds: 3 }; }, null],
   ["automation absent is valid", (c) => { delete c.automation; }, null],
   ["automation bad level", (c) => { c.automation = { level: "yolo" }; }, "automation.level"],
   ["automation missing level", (c) => { c.automation = { max_fix_rounds: 2 }; }, "required field 'automation.level'"],
   ["automation unknown key", (c) => { c.automation = { level: "manual", turbo: true }; }, "unknown key 'automation.turbo'"],
-  ["automation zero cap", (c) => { c.automation = { level: "conveyor", max_fix_rounds: 0 }; }, "integer >= 1"],
-  ["automation string cap", (c) => { c.automation = { level: "conveyor", max_fix_rounds: "2" }; }, "integer >= 1"],
+  ["automation zero cap", (c) => { c.automation = { level: "roundabout", max_fix_rounds: 0 }; }, "integer >= 1"],
+  ["automation string cap", (c) => { c.automation = { level: "roundabout", max_fix_rounds: "2" }; }, "integer >= 1"],
   ["automation highways", (c) => { c.automation = { level: "highways" }; }, null],
+  ["automation legacy conveyor names the rename", (c) => { c.automation = { level: "conveyor" }; }, 'renamed to "roundabout"'],
   ["attention empty map", (c) => { c.routing.attention = {}; }, null],
   ["attention valid map", (c) => { c.routing.attention = { billing: ["src/billing/**"], schema: ["prisma/migrations/**"] }; }, null],
   ["attention not an object", (c) => { c.routing.attention = ["src/billing/**"]; }, "routing.attention"],
@@ -641,7 +644,7 @@ function runAudit(taskIdArg) {
 // Deterministic attention-topic query (design spec
 // 2026-07-25-highways-streams §2.2): which routing.attention categories
 // does this spec's Touch list match? Informational — exit 0 with or
-// without matches; the conveyor/highway procedures park a task on any
+// without matches; the roundabout/highway procedures park a task on any
 // match instead of re-implementing glob matching in prose.
 function runAttention(specPathArg) {
   if (!specPathArg) { console.error("attention: --spec <path> required"); process.exit(1); }

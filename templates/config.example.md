@@ -101,7 +101,7 @@ missing prefix as an all-zero-matches warning.
   repeated here.
 - `attention` (object, optional): named attention categories — category
   name → list of path globs. In an unattended walk (`/lanes-run` at
-  `conveyor` or above, or a `/lanes-highway` run), a task whose Touch
+  `roundabout` or above, or a `/lanes-highway` run), a task whose Touch
   list matches any of these globs parks on arrival, with the category
   named in the park reason — "this topic waits for me." Unlike
   `security_routed` it does not force KEEP routing and is not a gate
@@ -134,7 +134,7 @@ different paths.
 
 ## `automation`  (optional — omit for today's fully-manual behavior)
 
-The Roundabout trust ladder: how much of the pipeline runs unattended.
+The trust ladder: how much of the pipeline runs unattended.
 Trust is DECLARED — you flip this when you judge the project ready; the
 ledger history is evidence you consult, not a mechanism.
 
@@ -144,13 +144,13 @@ ledger history is evidence you consult, not a mechanism.
   - `"verdicts"` — you still emit and dispatch each spec; reviewer
     verdicts are acted on unattended (APPROVE → merge + clean up,
     FIX → re-dispatch up to the cap). REJECT always stops for you.
-  - `"conveyor"` — `/lanes-run <plan>` drives the whole task graph
+  - `"roundabout"` — `/lanes-run <plan>` drives the whole task graph
     end-to-end; see that command for park semantics.
   - `"highways"` — `/lanes-highway <feature>` runs the full two-level
     stream orchestration: one human gate (the stream map), unattended
     per-stream planning, concurrent stream execution, and an
     integration branch + review document — the working branch is never
-    touched. Includes everything `"conveyor"` authorizes.
+    touched. Includes everything `"roundabout"` authorizes.
 - `max_fix_rounds` (integer ≥ 1, optional, default `2`): how many FIX
   rounds a task gets before it parks as needs-human.
 
