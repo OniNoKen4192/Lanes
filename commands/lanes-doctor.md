@@ -59,13 +59,18 @@ Run (Bash):
 
     node "${CLAUDE_PLUGIN_ROOT}/bin/lanes-validate.mjs" doctor
 
-Its JSON report is the evidence for four checks — `schema`, `globs`,
-`commands`, `baseline` — each `pass | warn | fail`, plus a top-level
-`verdict` (`ok` | `not_safe`; the process exits 0 only when nothing
-failed). Render it readably: one line per check with its status, then
-the details of every check that isn't `pass` — each glob's match count
-and sample (or its malformed-pattern error), each unresolved command's
-note, each dirty path. Do not re-derive any of these by judgment — the
+Its JSON report is the evidence for five checks — `schema`, `globs`,
+`commands`, `baseline`, `hook_gate` — each `pass | warn | fail`, plus a
+top-level `verdict` (`ok` | `not_safe`; the process exits 0 only when
+nothing failed). `hook_gate` verifies the configured
+`backend.dispatch_tool` actually has a PreToolUse matcher in the
+plugin's `hooks/hooks.json` — without it, dispatches would run with no
+deterministic gate at all, so a mismatch (e.g. a backend swap that
+edited config but not the hook) is a hard fail. Render the report
+readably: one line per check with its status, then the details of every
+check that isn't `pass` — each glob's match count and sample (or its
+malformed-pattern error), each unresolved command's note, each dirty
+path. Do not re-derive any of these by judgment — the
 subcommand's output is the authority (matching semantics:
 `${CLAUDE_PLUGIN_ROOT}/docs/PATH-MATCHING.md`).
 Also render the report's top-level `automation` field as one

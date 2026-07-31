@@ -360,3 +360,47 @@ describe("worktree create --stream --base: cut from named ref", () => {
     assert.equal(gitC(fx.dir, "rev-parse", "highway/s2"), baseSha);
   });
 });
+
+// IDs name branches and worktree directories verbatim — noncanonical
+// ones (anything outside ^[A-Za-z0-9][A-Za-z0-9._-]*$) are refused, not
+// sanitized, so two distinct IDs can never share a branch or path.
+
+describe("worktree create: noncanonical Task ID refused", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree create: noncanonical Task ID refused", () => {
+    fs.writeFileSync(path.join(fx.dir, "docs", "tasks", "T2.md"),
+      T2_SPEC.replace("**Task ID**: T2", "**Task ID**: foo/bar"));
+    const r = validate(fx.dir, "worktree", "create", "--spec", "docs/tasks/T2.md");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.check, "worktree");
+    assert.ok(r.json.reason.includes("foo/bar"), `expected reason to name the bad ID, got: ${r.json.reason}`);
+    assert.ok(!fs.existsSync(path.join(fx.dir, ".lanes", "worktrees", "foo_bar")),
+      "a refused ID must not leave a sanitized worktree behind");
+  });
+});
+
+describe("worktree create --stream: noncanonical stream ID refused", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree create --stream: noncanonical stream ID refused", () => {
+    const r = validate(fx.dir, "worktree", "create", "--stream", "a b");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.check, "worktree");
+    assert.ok(r.json.reason.includes("a b"), `expected reason to name the bad ID, got: ${r.json.reason}`);
+  });
+});
+
+describe("worktree remove: noncanonical ID refused", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("worktree remove: noncanonical ID refused", () => {
+    const r = validate(fx.dir, "worktree", "remove", "--task", "../escape");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.check, "worktree");
+    assert.ok(r.json.reason.includes("../escape"), `expected reason to name the bad ID, got: ${r.json.reason}`);
+  });
+});

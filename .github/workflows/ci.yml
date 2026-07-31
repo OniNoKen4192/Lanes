@@ -15,6 +15,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         node: [20, 22]
+        include:
+          # One macOS job (not the full matrix): worktrees, symlinks, and
+          # path normalization are the platform-sensitive surfaces.
+          - os: macos-latest
+            node: 22
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

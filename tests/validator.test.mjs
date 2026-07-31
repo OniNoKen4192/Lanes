@@ -350,6 +350,38 @@ describe("doctor: clean fixture is ok", () => {
   });
 });
 
+// The dispatch gate only exists where hooks/hooks.json's PreToolUse
+// matcher equals the configured dispatch tool. A backend swap that edits
+// config but not the hook would dispatch WITHOUT the gate — the doctor
+// must catch that mechanically.
+
+describe("doctor: hook gate lockstep passes on the shipped backend", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("doctor: hook gate lockstep passes on the shipped backend", () => {
+    const r = validate(fx.dir, "doctor");
+    assert.equal(r.status, 0, `doctor failed: ${r.stdout}`);
+    assert.equal(r.json.checks.hook_gate.status, "pass");
+  });
+});
+
+describe("doctor: hook gate mismatch is not_safe", () => {
+  const fx = makeFixtureRepo({ patchConfig: (c) => { c.backend.dispatch_tool = "mcp__other__dispatch"; } });
+  after(() => fx.cleanup());
+
+  test("doctor: hook gate mismatch is not_safe", () => {
+    const r = validate(fx.dir, "doctor");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.verdict, "not_safe");
+    assert.equal(r.json.checks.hook_gate.status, "fail");
+    assert.ok(r.json.checks.hook_gate.reason.includes("mcp__other__dispatch"),
+      `expected the reason to name the unmatched tool, got: ${r.json.checks.hook_gate.reason}`);
+    assert.ok(r.json.checks.hook_gate.reason.includes("without the deterministic gate"),
+      `expected the reason to state the consequence, got: ${r.json.checks.hook_gate.reason}`);
+  });
+});
+
 describe("gate: valid automation block accepted", () => {
   const fx = makeFixtureRepo({ patchConfig: (c) => {
     c.automation = { level: "roundabout", max_fix_rounds: 3 };
@@ -823,5 +855,115 @@ describe("seed --check: mtime fallback when heading unparseable", () => {
     const r = validate(fx.dir, "seed", "--check");
     assert.equal(r.status, 0);
     assert.match(r.stdout.trim(), /^A rest-stop seed from \d{4}-\d{2}-\d{2} exists — read \.lanes\/seed\.md to resume\.$/);
+  });
+});
+
+// Task/stream IDs become state filenames, branch names, and worktree
+// paths. Sanitizing (foo/bar → foo_bar) collides with a literal foo_bar
+// — one task's audit could read another task's baseline. Noncanonical
+// IDs are therefore refused outright: ^[A-Za-z0-9][A-Za-z0-9._-]*$
+
+describe("gate: noncanonical Task ID refused", () => {
+  const spec = FIXTURE_SPEC.replace("**Task ID**: T1", "**Task ID**: foo/bar");
+  const fx = makeFixtureRepo({ spec });
+  after(() => fx.cleanup());
+
+  test("gate: noncanonical Task ID refused", () => {
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.ok, false);
+    assert.equal(r.json.check, "spec");
+    assert.ok(r.json.reason.includes("foo/bar"), `expected reason to name the bad ID, got: ${r.json.reason}`);
+    assert.ok(!fs.existsSync(path.join(fx.dir, ".lanes", "state", "foo_bar.json")),
+      "a refused ID must not leave a sanitized state file behind");
+  });
+});
+
+describe("audit: noncanonical --task refused", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("audit: noncanonical --task refused", () => {
+    const r = validate(fx.dir, "audit", "--task", "foo/bar");
+    assert.equal(r.status, 2);
+    assert.ok(r.stdout.includes("foo/bar"), `expected output to name the bad ID, got: ${r.stdout}`);
+  });
+});
+
+describe("audit: staged rename flags both sides", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("audit: staged rename flags both sides", () => {
+    assert.equal(validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md").status, 0);
+    execFileSync("git", ["-C", fx.dir, "mv", "src/lib/thing.js", "src/lib/renamed.js"], { encoding: "utf8" });
+
+    const r = validate(fx.dir, "audit", "--task", "T1");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.verdict, "violations");
+    assert.ok(r.json.in_scope.includes("src/lib/thing.js"),
+      `expected the rename's old side in in_scope, got: ${JSON.stringify(r.json)}`);
+    assert.ok(r.json.out_of_scope.includes("src/lib/renamed.js"),
+      `expected the rename's new side in out_of_scope, got: ${JSON.stringify(r.json)}`);
+  });
+});
+
+describe("gate: staged rename dirties both sides", () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("gate: staged rename dirties both sides", () => {
+    execFileSync("git", ["-C", fx.dir, "mv", "src/lib/thing.js", "src/lib/renamed.js"], { encoding: "utf8" });
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.check, "clean_baseline");
+    for (const p of ["src/lib/thing.js", "src/lib/renamed.js"]) {
+      assert.ok(r.json.dirty.includes(p), `expected ${p} in dirty, got: ${JSON.stringify(r.json.dirty)}`);
+    }
+  });
+});
+
+// Filenames containing quotes, tabs, or newlines are C-quoted in git's
+// human-readable output regardless of core.quotepath — only NUL-delimited
+// (-z) plumbing yields them verbatim. NTFS forbids these characters, so
+// the fixture is unix-only; CI's ubuntu/macos jobs run it.
+const WEIRD_NAME = 'we"ird\tna\nme.js';
+
+describe("gate/audit: control-character filenames survive -z parsing",
+  { skip: process.platform === "win32" && "NTFS forbids these characters in filenames" }, () => {
+  const fx = makeFixtureRepo();
+  after(() => fx.cleanup());
+
+  test("gate lists the exact dirty path", () => {
+    fs.writeFileSync(path.join(fx.dir, "src", WEIRD_NAME), "x\n");
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 2);
+    assert.equal(r.json.check, "clean_baseline");
+    assert.ok(r.json.dirty.includes(`src/${WEIRD_NAME}`),
+      `expected the verbatim filename in dirty, got: ${JSON.stringify(r.json.dirty)}`);
+    fs.rmSync(path.join(fx.dir, "src", WEIRD_NAME));
+  });
+
+  test("audit classifies the exact untracked path out of scope", () => {
+    assert.equal(validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md").status, 0);
+    fs.writeFileSync(path.join(fx.dir, "src", WEIRD_NAME), "x\n");
+    const r = validate(fx.dir, "audit", "--task", "T1");
+    assert.equal(r.status, 2);
+    assert.ok(r.json.out_of_scope.includes(`src/${WEIRD_NAME}`),
+      `expected the verbatim filename in out_of_scope, got: ${JSON.stringify(r.json.out_of_scope)}`);
+  });
+});
+
+describe("gate: canonical dotted plan-slug ID accepted", () => {
+  const spec = FIXTURE_SPEC.replace("**Task ID**: T1", "**Task ID**: scope-gate.03");
+  const fx = makeFixtureRepo({ spec });
+  after(() => fx.cleanup());
+
+  test("gate: canonical dotted plan-slug ID accepted", () => {
+    const r = validate(fx.dir, "gate", "--spec", "docs/tasks/T1.md");
+    assert.equal(r.status, 0);
+    assert.equal(r.json.task, "scope-gate.03");
+    assert.ok(fs.existsSync(path.join(fx.dir, ".lanes", "state", "scope-gate.03.json")),
+      "state file should be named by the ID verbatim");
   });
 });

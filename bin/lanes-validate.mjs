@@ -8,6 +8,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
@@ -192,6 +193,17 @@ function loadConfig(rootDir = ".") {
 }
 
 // ---------------------------------------------------------------- parsing
+
+// Task and stream IDs become state filenames, branch names, and
+// worktree paths VERBATIM. Sanitizing instead would collide distinct
+// IDs (foo/bar and foo_bar both → foo_bar — one task's audit reading
+// another task's baseline), so anything outside this charset is a
+// refusal, never a conversion.
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+function idError(id) {
+  return `ID '${id}' is not a canonical Lanes ID — IDs name state files, branches, and worktrees verbatim and must match [A-Za-z0-9][A-Za-z0-9._-]* (e.g. <plan-slug>.03)`;
+}
 
 // Extracts what the gate/audit need from a TEMPLATE.md-conformant spec:
 // Task ID and Model hint from Meta, Touch paths from the `### Touch` table.
@@ -433,6 +445,51 @@ function git(...args) {
   return execFileSync("git", ["-c", "core.quotepath=false", ...args], { encoding: "utf8" }).trimEnd();
 }
 
+// Raw variant for NUL-delimited (-z) plumbing: no trimEnd — a path may
+// legitimately end in whitespace; callers split on NUL and drop the
+// empty terminator token instead.
+function gitz(...args) {
+  return execFileSync("git", ["-c", "core.quotepath=false", ...args], { encoding: "utf8" });
+}
+
+// `git status --porcelain -z` record stream → the path(s) each entry
+// names. In -z format paths are verbatim (never C-quoted), and a
+// rename/copy entry's ORIGINAL path arrives as its own NUL-terminated
+// field after the entry — filenames with tabs, quotes, newlines, or a
+// literal " -> " cannot corrupt the parse.
+function statusPathsZ(out) {
+  const tokens = out.split("\0");
+  const paths = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const entry = tokens[i];
+    if (!entry) continue;
+    paths.push(normalizePath(entry.slice(3)));
+    if (/[RC]/.test(entry.slice(0, 2)) && tokens[i + 1]) {
+      paths.push(normalizePath(tokens[++i]));
+    }
+  }
+  return paths;
+}
+
+// `git diff --name-status -z` record stream → every path named. Layout:
+// status NUL path NUL, with a second path field for R/C records —
+// renames/copies contribute both sides (§6.4).
+function diffPathsZ(out) {
+  const tokens = out.split("\0");
+  const paths = [];
+  for (let i = 0; i < tokens.length; ) {
+    const status = tokens[i++];
+    if (!status) continue;
+    const first = tokens[i++];
+    if (first) paths.push(normalizePath(first));
+    if (/^[RC]/.test(status)) {
+      const second = tokens[i++];
+      if (second) paths.push(normalizePath(second));
+    }
+  }
+  return paths;
+}
+
 function sha256(buf) {
   return createHash("sha256").update(buf).digest("hex");
 }
@@ -443,16 +500,6 @@ function sha256(buf) {
 // spec 2026-07-25-worktree-isolation §2).
 function mainRepoRoot() {
   return path.resolve(git("rev-parse", "--git-common-dir"), "..");
-}
-
-// One `git status --porcelain` line → the path(s) it names.
-// Renames arrive as "R  old -> new"; quoted paths lose their quotes.
-function statusPaths(line) {
-  const unquote = (s) => s.replace(/^"(.*)"$/, "$1");
-  const body = line.slice(3);
-  const isRenameOrCopy = /[RC]/.test(line.slice(0, 2));
-  return (isRenameOrCopy && body.includes(" -> ") ? body.split(" -> ") : [body])
-    .map((s) => normalizePath(unquote(s)));
 }
 
 function submodulePaths() {
@@ -507,6 +554,7 @@ function runGate(specPathArg) {
   const specText = fs.readFileSync(specPath, "utf8");
   const spec = parseSpec(specBody(specText));
   if (!spec.taskId) gateFail("spec", "spec has no '**Task ID**:' entry in Meta");
+  if (!SAFE_ID.test(spec.taskId)) gateFail("spec", idError(spec.taskId));
   if (!spec.touch.length) gateFail("spec", "spec's Touch table is empty or unparseable");
 
   // Routing law (§3.1 check 4): a keep-hinted spec never dispatches.
@@ -518,11 +566,8 @@ function runGate(specPathArg) {
   // Clean baseline except pipeline allowlist (§3.1 check 2, §2 decision 3).
   const allowlist = [".lanes", config.pipeline.tasks_dir, config.pipeline.plans_dir, config.pipeline.ledger];
   const dirty = [];
-  for (const line of git("status", "--porcelain", "--untracked-files=all").split("\n")) {
-    if (!line.trim()) continue;
-    for (const p of statusPaths(line)) {
-      if (!matchAny(allowlist, p)) dirty.push(p);
-    }
+  for (const p of statusPathsZ(gitz("status", "--porcelain", "-z", "--untracked-files=all"))) {
+    if (!matchAny(allowlist, p)) dirty.push(p);
   }
   if (dirty.length) {
     gateFail("clean_baseline",
@@ -552,8 +597,9 @@ function runGate(specPathArg) {
     }
   }
 
-  // Record the baseline (§5).
-  const taskFile = spec.taskId.replace(/[^A-Za-z0-9._-]/g, "_");
+  // Record the baseline (§5). The filename is the ID verbatim — safe
+  // because SAFE_ID was enforced above.
+  const taskFile = spec.taskId;
   const state = {
     task: spec.taskId,
     spec_path: specPath,
@@ -574,11 +620,15 @@ function runGate(specPathArg) {
 
 function runAudit(taskIdArg) {
   if (!taskIdArg) { console.error("audit: --task <id> required"); process.exit(1); }
+  if (!SAFE_ID.test(taskIdArg)) {
+    console.log(JSON.stringify({ task: taskIdArg, verdict: "violations", error: idError(taskIdArg) }));
+    process.exit(2);
+  }
   const root = git("rev-parse", "--show-toplevel");
   process.chdir(root);
   const config = loadConfig(mainRepoRoot());
 
-  const statePath = path.join(mainRepoRoot(), ".lanes", "state", `${taskIdArg.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
+  const statePath = path.join(mainRepoRoot(), ".lanes", "state", `${taskIdArg}.json`);
   if (!fs.existsSync(statePath)) {
     console.log(JSON.stringify({ task: taskIdArg, verdict: "violations",
       error: `no baseline state at ${statePath} — was this task dispatched through the gate?` }));
@@ -594,19 +644,12 @@ function runAudit(taskIdArg) {
 
   // All four surfaces (§3.2): committed, staged, unstaged, untracked.
   const changed = new Set();
-  const collect = (out) => {
-    for (const line of out.split("\n")) {
-      if (!line.trim()) continue;
-      const parts = line.split("\t");
-      const paths = /^[RC]/.test(parts[0]) ? parts.slice(1) : [parts[1]]; // renames/copies: both sides (§6.4)
-      for (const p of paths) if (p) changed.add(normalizePath(p));
-    }
-  };
-  collect(git("diff", "--name-status", `${state.base_sha}..HEAD`));
-  collect(git("diff", "--name-status", "--cached"));
-  collect(git("diff", "--name-status"));
-  for (const p of git("ls-files", "--others", "--exclude-standard").split("\n")) {
-    if (p.trim()) changed.add(normalizePath(p));
+  const collect = (out) => { for (const p of diffPathsZ(out)) changed.add(p); };
+  collect(gitz("diff", "--name-status", "-z", `${state.base_sha}..HEAD`));
+  collect(gitz("diff", "--name-status", "-z", "--cached"));
+  collect(gitz("diff", "--name-status", "-z"));
+  for (const p of gitz("ls-files", "--others", "--exclude-standard", "-z").split("\0")) {
+    if (p) changed.add(normalizePath(p));
   }
 
   const allowlist = [".lanes", config.pipeline.tasks_dir, config.pipeline.plans_dir, config.pipeline.ledger];
@@ -720,7 +763,7 @@ function runDoctor() {
     checks.schema = { status: "pass" };
   } catch (err) {
     checks.schema = { status: "fail", reason: String(err.message || err) };
-    for (const c of ["globs", "commands", "baseline"]) {
+    for (const c of ["globs", "commands", "baseline", "hook_gate"]) {
       checks[c] = { status: "fail", reason: "skipped — config did not load" };
     }
   }
@@ -729,7 +772,7 @@ function runDoctor() {
     // Check 2 — glob preview (§4.2): every routing pattern against the
     // tracked tree, using the one true matcher. Zero matches = warn (a
     // not-yet-created path is legitimate); malformed pattern = fail.
-    const tracked = git("ls-files").split("\n").filter(Boolean).map(normalizePath);
+    const tracked = gitz("ls-files", "-z").split("\0").filter(Boolean).map(normalizePath);
     const patterns = [
       ...config.routing.security_routed.map((p) => ["routing.security_routed", p]),
       ...config.routing.do_not_touch.map((p) => ["routing.do_not_touch", p]),
@@ -802,15 +845,32 @@ function runDoctor() {
     // standalone. Any dirty path outside the pipeline allowlist = fail.
     const allowlist = [".lanes", config.pipeline.tasks_dir, config.pipeline.plans_dir, config.pipeline.ledger];
     const dirty = [];
-    for (const line of git("status", "--porcelain", "--untracked-files=all").split("\n")) {
-      if (!line.trim()) continue;
-      for (const p of statusPaths(line)) {
-        if (!matchAny(allowlist, p)) dirty.push(p);
-      }
+    for (const p of statusPathsZ(gitz("status", "--porcelain", "-z", "--untracked-files=all"))) {
+      if (!matchAny(allowlist, p)) dirty.push(p);
     }
     checks.baseline = dirty.length
       ? { status: "fail", reason: "working tree is not clean — commit or stash before dispatching", dirty }
       : { status: "pass" };
+
+    // Check 5 — hook gate lockstep. The dispatch gate is a PreToolUse
+    // hook whose matcher is a static string in the PLUGIN's hooks.json;
+    // it cannot follow this repo's config at runtime. If the configured
+    // dispatch tool has no matcher there, every dispatch would run
+    // WITHOUT the deterministic gate — the exact failure a backend swap
+    // that edits config but forgets hooks.json produces. Fail, not warn.
+    try {
+      const hooksPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "hooks", "hooks.json");
+      const matchers = (JSON.parse(fs.readFileSync(hooksPath, "utf8")).hooks?.PreToolUse ?? [])
+        .map((h) => h.matcher);
+      checks.hook_gate = matchers.includes(config.backend.dispatch_tool)
+        ? { status: "pass", matcher: config.backend.dispatch_tool }
+        : {
+            status: "fail",
+            reason: `backend.dispatch_tool '${config.backend.dispatch_tool}' has no PreToolUse matcher in the plugin's hooks/hooks.json (matchers: ${matchers.join(", ") || "none"}) — dispatches would run without the deterministic gate; a second backend requires updating hooks/hooks.json too`,
+          };
+    } catch (err) {
+      checks.hook_gate = { status: "fail", reason: `cannot read the plugin's hooks/hooks.json: ${String((err && err.message) || err)}` };
+    }
   }
 
   const failed = Object.values(checks).some((c) => c.status === "fail");
@@ -888,7 +948,8 @@ function runWorktreeCreate(specPathArg, baseArg) {
   if (!fs.existsSync(specPath)) wtFail(`spec file not found: ${specPath}`);
   const spec = parseSpec(specBody(fs.readFileSync(specPath, "utf8")));
   if (!spec.taskId) wtFail("spec has no '**Task ID**:' entry in Meta");
-  const taskFile = spec.taskId.replace(/[^A-Za-z0-9._-]/g, "_");
+  if (!SAFE_ID.test(spec.taskId)) wtFail(idError(spec.taskId));
+  const taskFile = spec.taskId;
   const branch = `lanes/${taskFile}`;
   const wtPath = `.lanes/worktrees/${taskFile}`;
   if (fs.existsSync(wtPath)) {
@@ -919,7 +980,8 @@ function runWorktreeCreateStream(streamIdArg, baseArg) {
     wtFail("worktree create must run from the main working tree, not a linked worktree");
   }
   try { loadConfig(); } catch (err) { wtFail(String(err.message || err)); }
-  const streamFile = streamIdArg.replace(/[^A-Za-z0-9._-]/g, "_");
+  if (!SAFE_ID.test(streamIdArg)) wtFail(idError(streamIdArg));
+  const streamFile = streamIdArg;
   const branch = `highway/${streamFile}`;
   const wtPath = `.lanes/worktrees/stream-${streamFile}`;
   if (fs.existsSync(wtPath)) {
@@ -938,9 +1000,10 @@ function runWorktreeCreateStream(streamIdArg, baseArg) {
 function runWorktreeRemove(idArg, force, kind) {
   const flag = kind === "stream" ? "--stream" : "--task";
   if (!idArg) { console.error(`worktree remove: ${flag} <id> required`); process.exit(1); }
+  if (!SAFE_ID.test(idArg)) wtFail(idError(idArg));
   const root = git("rev-parse", "--show-toplevel");
   process.chdir(root);
-  const idFile = idArg.replace(/[^A-Za-z0-9._-]/g, "_");
+  const idFile = idArg;
   const wtPath = kind === "stream" ? `.lanes/worktrees/stream-${idFile}` : `.lanes/worktrees/${idFile}`;
   const branch = kind === "stream" ? `highway/${idFile}` : `lanes/${idFile}`;
   const idKey = kind === "stream" ? "stream" : "task";

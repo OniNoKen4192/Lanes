@@ -11,7 +11,7 @@
       "name": "lanes",
       "source": "./",
       "description": "Cross-model task routing: frontier Claude plans and reviews; a delegated backend implements. Requires superpowers.",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "keywords": ["workflow", "cross-model", "codex", "superpowers"]
     }
   ]

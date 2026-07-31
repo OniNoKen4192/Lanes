@@ -51,9 +51,13 @@ walking skeleton with superpowers first, then come back.
 
 After init — or any time — run `/lanes-doctor`: it validates the config
 against its schema, previews what your security globs actually match,
-resolves your verification commands against the manifest, and reports
-whether the repo and backend are safe to operate on. It is also the
-migration path if your project still has a legacy Markdown config.
+resolves your verification commands against the manifest, checks the
+clean baseline, verifies the dispatch gate actually covers your
+configured backend tool, and confirms the backend's MCP tools are
+reachable in the current session. That certifies configuration and
+repository readiness — it does not prove a live dispatch will succeed.
+It is also the migration path if your project still has a legacy
+Markdown config.
 
 ## Use it
 
@@ -147,9 +151,34 @@ dispatch/reply calls) is isolated to the block marked
 `<!-- BEGIN BACKEND SEAM -->` / `<!-- END BACKEND SEAM -->` in
 [`agents/lanes-implementer.md`](agents/lanes-implementer.md), plus four
 fields in `.lanes/config.json` (`dispatch_tool`, `reply_tool`,
-`approval_mode`, `ratelimit_signal`) and that agent's `tools:` frontmatter
-line. A second backend is a config change plus a rewrite of that one
-block — not a rewrite of the plugin.
+`approval_mode`, `ratelimit_signal`), that agent's `tools:` frontmatter
+line — and two mechanical surfaces the prose can't reach: the
+PreToolUse matcher in [`hooks/hooks.json`](hooks/hooks.json) that binds
+the deterministic dispatch gate to the backend's tool, and the
+conformance tests that lock that matcher in step with the example
+config. A second backend is a config change, a rewrite of that one
+block, and a new hook matcher — not a rewrite of the plugin. Forgetting
+the matcher can't fail silently: `/lanes-doctor`'s `hook_gate` check
+fails hard whenever the configured dispatch tool and the hook matcher
+disagree, because that mismatch would otherwise mean dispatches running
+with no gate at all.
+
+One boundary is worth naming plainly. The gate recognizes a Lanes
+dispatch by the `LANES-SPEC:` header on the first line of the prompt,
+which the trusted controller (`lanes-implementer`) constructs; a
+dispatch without that header passes through untouched, by design —
+ordinary, non-Lanes use of the backend tool in the same session must
+keep working. So "fail closed" is a guarantee about *recognized Lanes
+dispatches*, not about every conceivable call to the backend tool. The
+audit backstops the difference: a task with no gate-written baseline
+fails its audit outright ("was this task dispatched through the
+gate?"), so an ungated dispatch can't produce an approvable result.
+And whatever the rung, a run's authority ends at your local repository:
+a roundabout run lands frontier-approved tasks on your local working
+branch only, a highway run touches nothing but its own
+`highway/integration` branch — which you read and merge by hand — and
+nothing is ever pushed to a remote. "Unattended" here means unattended
+*execution*; publishing the result is always a human act.
 
 ## License
 

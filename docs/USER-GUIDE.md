@@ -77,11 +77,13 @@ From the root of the project Lanes will operate on:
 2. **`/lanes-doctor`** — the health check, safe to run any time. It
    validates the config against its schema, previews what every routing
    glob actually matches, resolves your commands against the manifest,
-   checks the clean baseline, and verifies the backend's MCP tools are
-   reachable. It ends with exactly one verdict: healthy / healthy with
-   warnings / not safe to operate — and the one action that unblocks the
-   worst finding. It is also the one-time migration path from a legacy
-   Markdown config.
+   checks the clean baseline, verifies the dispatch gate's hook matcher
+   covers your configured backend tool, and confirms the backend's MCP
+   tools are reachable. It ends with exactly one verdict: healthy /
+   healthy with warnings / not safe to operate — and the one action that
+   unblocks the worst finding. It certifies configuration and repository
+   readiness, not that a live dispatch will succeed. It is also the
+   one-time migration path from a legacy Markdown config.
 
 The full field-by-field config reference is
 [`templates/config.example.md`](../templates/config.example.md), with
